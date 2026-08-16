@@ -1,1 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LeastScore • Online Card Game</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="bg"></div><div id="toast"></div>
+<section id="auth" class="screen">
+  <div class="auth-card">
+    <div class="brand"><span>♠</span> Least<span>Score</span></div>
+    <p class="tag">The lowest score survives. Play live with friends.</p>
+    <div class="tabs"><button class="tab active" data-mode="login">Login</button><button class="tab" data-mode="register">Create account</button></div>
+    <input id="username" placeholder="Username" autocomplete="username">
+    <input id="password" type="password" placeholder="Password" autocomplete="current-password">
+    <button id="authBtn" class="primary">Enter the table</button>
+    <p id="authMsg" class="muted"></p>
+  </div>
+</section>
 
+<section id="lobby" class="screen hidden">
+  <header class="topbar"><div class="brand small">♠ Least<span>Score</span></div><div><span id="welcome"></span><button id="logout" class="ghost">Log out</button></div></header>
+  <div class="lobby-wrap">
+    <div class="hero"><div><p class="eyebrow">ONLINE TABLE</p><h1>Make the lowest<br><em>score</em> win.</h1><p>Invite your friends, deal five cards and outsmart the table.</p></div><div class="hero-card">A♥<small>1 point</small></div></div>
+    <div class="room-grid">
+      <div class="panel mode-card"><div class="mode-icon">♠</div><h2>Play with friends</h2><p>Create a private room and invite friends with a 5-character code.</p><button id="create" class="primary">＋ Create private game</button></div>
+      <div class="panel mode-card"><div class="mode-icon bot">✦</div><h2>Play with bots</h2><p>No friends online? Fill the table with smart bots and start immediately.</p><div class="bot-setup"><select id="botCount"><option value="1">1 bot · 2 players</option><option value="2">2 bots · 3 players</option><option value="3" selected>3 bots · 4 players</option><option value="4">4 bots · 5 players</option><option value="5">5 bots · 6 players</option></select><button id="playBots" class="primary">Play solo</button></div></div>
+      <div class="panel join-card"><h2>Join a friend</h2><p>Enter the room code your friend sent you.</p><div class="join"><input id="roomCode" maxlength="5" placeholder="ABCDE"><button id="join" class="primary">Join</button></div></div>
+    </div>
+    <div class="rules panel"><div class="rules-head"><div><h2>Quick rules</h2><p>Built around the rules you described.</p></div><span class="online-badge">● LIVE ONLINE</span></div><div class="rule-row"><b>01</b><span><strong>Pick</strong> from the deck or the open card.</span></div><div class="rule-row"><b>02</b><span><strong>Discard</strong> one card to finish your turn.</span></div><div class="rule-row"><b>03</b><span><strong>Declare</strong> only with a valid 5-card arrangement.</span></div><div class="rule-row"><b>04</b><span>Lowest total is best. Reach 100 and you're eliminated.</span></div></div>
+  </div>
+</section>
+
+<section id="game" class="hidden">
+<header class="topbar gamebar"><div class="brand small">♠ Least<span>Score</span></div><div class="room-pill">ROOM <b id="code"></b><button id="copyCode">Copy</button></div><div class="score-mini">Your score <b id="myScore">0</b></div></header>
+<main class="game-layout">
+  <aside class="side left"><div class="panel players"><div class="section-title">TABLE <span id="round"></span></div><div id="players"></div></div><div class="panel history"><div class="section-title">ROUND LOG</div><div id="log"></div></div></aside>
+  <section class="table">
+    <div id="turnBanner" class="turn-banner">Waiting…</div>
+    <div class="table-felt">
+      <div class="felt-glow"></div>
+      <div class="piles">
+        <button id="deck" class="pile deck-card" title="Draw from deck"><span>♠</span><small>DECK</small><b id="deckCount">52</b></button>
+        <button id="open" class="pile open-card"><div id="openCard"></div><small>OPEN</small></button>
+      </div>
+      <div class="hint">Pick one → choose a card to discard → <b>Move</b></div>
+    </div>
+    <div class="my-area">
+      <div class="my-head"><span>Your hand</span><span id="handStatus">5 cards</span></div>
+      <div id="hand" class="hand"></div>
+      <div class="actions"><button id="declare" class="declare">⚑ Declare</button><button id="move" class="primary move">Move <span>→</span></button></div>
+    </div>
+  </section>
+  <aside class="side right"><div class="panel round-info"><div class="section-title">HOW IT WORKS</div><p><b>Even sets</b><br>Same rank, 2 or 4 cards.</p><p><b>Odd sequences</b><br>Same suit, 3 or 5 cards.</p><p class="tiny">A can be low in A-2-3-4-5 or high in 10-J-Q-K-A. K-A-2-3-4 is not allowed.</p></div><div id="roundResult" class="panel result hidden"></div></aside>
+</main>
+</section>
+<script src="/socket.io/socket.io.js"></script><script src="/app.js"></script>
+</body></html>
