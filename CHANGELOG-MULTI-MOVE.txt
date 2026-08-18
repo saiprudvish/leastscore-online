@@ -1,10 +1,11 @@
-LeastScore multi-card move fix
+LeastScore v3
 
-- Move supports selecting multiple cards to LEAVE.
-- Legal leave groups: 2/4 same rank OR odd same-suit sequence (3/5/7...).
-- Choose DECK or OPEN, then press Move.
-- The picked card remains in the hand.
-- Declaration no longer requires exactly five cards or a special five-card pattern.
-- Remaining hand can shrink as cards are left.
-- Round scoring uses remaining hand score.
-- Bots use the same multi-card leave mechanic.
+Core fixes:
+- Fixed missing me.username in room state, which prevented local card selection and host controls.
+- Fixed first-round deadlock: after every active player makes one move, Declare unlocks.
+- Discarded cards now update the OPEN pile.
+- Added reconnect/rejoin handling for a player's room.
+- Added visible host Start Game / guest waiting status.
+- Fixed mobile lobby scrolling while keeping the game screen single-page.
+- Preserved configurable target score, turn timeout and deal timeout.
+- Preserved automatic timeout moves and automatic Deal after the deal countdown.

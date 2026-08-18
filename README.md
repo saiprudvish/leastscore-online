@@ -31,3 +31,19 @@ node server.js
 `npm start` is also equivalent because `package.json` defines it as `node server.js`.
 
 Set a strong `JWT_SECRET` environment variable in production.
+
+
+## v3 functional fixes
+
+- Restored the current player's username in the server state; this fixes card selection, Move, Declare and host Start controls.
+- Round 1 now completes after every active player has made one move; Declare unlocks only after that.
+- Discarded cards are added to the OPEN pile and the next player's state is broadcast immediately.
+- Added reconnect/rejoin support for the current room.
+- Friends lobby now shows a Start Game control to the host and a waiting message to guests.
+- Mobile lobby is vertically scrollable; the game table remains a single-screen, non-scrolling layout.
+- Turn and deal timers remain server-authoritative, with automatic actions on timeout.
+- Target score, turn time and deal time remain configurable.
+
+### Validation
+
+`node --check server.js` and `node --check public/app.js` pass. A mocked server-side game flow was also run covering initial deal, four-player first-round moves, OPEN pile update, Round 1 declaration unlock and declaration.
