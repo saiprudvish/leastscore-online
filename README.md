@@ -1,46 +1,33 @@
-# LeastScore Online
+# LeastScore Online — fixed multiplayer build
 
-A real-time multiplayer LeastScore card game for browsers, with private friend rooms and an offline-style bot table powered by the same server game engine.
+This build fixes the game flow and mobile UI around the latest requirements:
 
-## Features
+- Single-card and multi-card selection works. Partial selections are allowed while building a valid group.
+- Move validates on the server, replaces the picked card, updates the hand, records the move, and advances the turn.
+- Declare is locked during round 1 and unlocks only after round 1 completes.
+- After a declaration, the next active player receives the Deal button and countdown. If they do not press it, the next round starts automatically.
+- Turn timeout is server-side and performs an automatic random-card move.
+- Target score is configurable: 50 / 100 / 150.
+- Turn time is configurable up to 30 seconds.
+- Deal countdown is configurable: 5 / 10 seconds.
+- Multiplayer rooms use Socket.IO and the server is authoritative for moves, turns, scores and timers.
+- Bot mode uses the same server game engine.
+- Mobile game view is designed to fit cards, controls, timers and the player/move table on one screen without page scrolling.
 
-- Username/password accounts using bcrypt + JWT
-- Private 5-character rooms
-- Live multiplayer synchronization with Socket.IO rooms
-- 2–6 seats per table
-- Play with friends or instantly fill the table with 1–5 bots
-- Random first player each round
-- Pick from the closed deck or the open card
-- Pick → discard → Move turn flow
-- Declare only on the declaring player's turn
-- 5-second declaration check
-- Valid arrangements:
-  - Even same-rank sets (2 or 4 cards)
-  - Odd same-suit sequences (3 or 5 cards)
-  - A-2-3-4-5 and 10-J-Q-K-A are allowed
-  - K-A-2-3-4 is not allowed
-- Winner/loser round scoring and +25 penalty for an incorrect declaration
-- Elimination at 100+ points; last player standing wins
-- Opponent hands are never exposed during play
-- Round history reveals what each player picked/discarded after the round
-- Responsive premium card-table UI
-- Remote background card-table photography
+## Render
 
-## Run locally
+Build command:
 
 ```bash
 npm install
-npm start
 ```
 
-Open `http://localhost:3000`.
+Start command:
 
-## Deploy online
+```bash
+node server.js
+```
 
-Deploy the folder to any Node.js host that supports a long-running web process and WebSocket/Socket.IO traffic. Set a strong `JWT_SECRET` environment variable in production.
+`npm start` is also equivalent because `package.json` defines it as `node server.js`.
 
-For production persistence, replace the small JSON account store with PostgreSQL/Supabase/another database.
-
-## Bot behavior
-
-Bots use the same server-authoritative rules as human players. They evaluate the open card for obvious pair/sequence value, otherwise draw from the deck, discard a low-utility/high-value card, and declare when their five-card hand forms a valid arrangement.
+Set a strong `JWT_SECRET` environment variable in production.

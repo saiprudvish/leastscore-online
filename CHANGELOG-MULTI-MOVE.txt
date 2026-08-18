@@ -1,0 +1,10 @@
+LeastScore multi-card move fix
+
+- Move supports selecting multiple cards to LEAVE.
+- Legal leave groups: 2/4 same rank OR odd same-suit sequence (3/5/7...).
+- Choose DECK or OPEN, then press Move.
+- The picked card remains in the hand.
+- Declaration no longer requires exactly five cards or a special five-card pattern.
+- Remaining hand can shrink as cards are left.
+- Round scoring uses remaining hand score.
+- Bots use the same multi-card leave mechanic.
