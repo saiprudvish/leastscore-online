@@ -20,7 +20,13 @@ A mobile-first real-time card game based on your LeastScore rules and the refere
 - 100+ points eliminates a player.
 - Round continues until one player remains.
 - Players see scores and public pick/discard history, but never another player's five cards.
-- Responsive dark casino UI with a live internet background image.
+- Mobile-first UI matching the supplied LeastScore reference screenshots.
+- Scrollable game screen with clean turn/timer treatment.
+- Multi-select hand cards visibly lift/highlight before choosing Deck or a discard card.
+- Up to three discard choices are shown as real cards; no large "cards left" panel.
+- Floating in-game chat bottom sheet.
+- Server-validated Autoplay button for the current player.
+- No red/green turn background takeover; state is communicated with compact indicators.
 
 ## Run locally
 1. Install Node.js 18+.

@@ -323,7 +323,8 @@ function roomView(room, username) {
     me: me ? { username: me.username, hand: me.hand.map(publicCard), score: me.score } : null,
     log: room.log.slice(-18),
     declaration: room.declaration,
-    moveHistory: room.moveHistory.slice(-12)
+    moveHistory: room.moveHistory.slice(-12),
+    chat: room.chat.slice(-80)
   };
 }
 
@@ -412,7 +413,7 @@ function makeRoom(host, config) {
     code: "", host, players: [], round: 0, status: "lobby", deck: [], open: [], turn: 0, log: [], declaration: null,
     mode: "friends", config: normalizedConfig(config), turnStartedAt: null, turnDeadline: null,
     dealBy: null, dealByIndex: 0, dealDeadline: null, turnTimer: null, timerToken: 0,
-    roundReady: false, declarationUnlocked: false, roundMovedBy: new Set(), moveHistory: [], discardPool: []
+    roundReady: false, declarationUnlocked: false, roundMovedBy: new Set(), moveHistory: [], discardPool: [], chat: []
   };
 }
 
@@ -484,6 +485,29 @@ io.on("connection", socket => {
     const connectedHumans = room.players.filter(p => !p.bot && p.connected);
     if (connectedHumans.length < 2) return socket.emit("errorMsg", "At least 2 connected players are required.");
     newRound(room);
+  });
+
+  socket.on("autoplay", ({ code } = {}) => {
+    const room = rooms.get(code);
+    if (!room || room.status !== "playing") return socket.emit("errorMsg", "This round is not accepting moves.");
+    const p = findPlayer(room, username);
+    if (!p || p.eliminated || room.players[room.turn]?.username !== username) return socket.emit("errorMsg", "Autoplay is available only on your turn.");
+    const leaving = bestLeaveGroup(p.hand);
+    if (!leaving.length) return socket.emit("errorMsg", "No legal move is available.");
+    const source = botTakeChoice(room, p);
+    const pick = source === "open" ? (room.open[0] || null) : null;
+    if (!performMove(room, p, source, leaving, true, pick?.id || null)) socket.emit("errorMsg", "Autoplay could not complete the move.");
+  });
+
+  socket.on("chatMessage", ({ code, text } = {}) => {
+    const room = rooms.get(String(code || "").trim().toUpperCase());
+    const p = room && findPlayer(room, username);
+    const clean = String(text || "").trim().slice(0, 180);
+    if (!room || !p || p.eliminated || !clean) return;
+    const message = { id: `${Date.now()}-${Math.random().toString(36).slice(2,7)}`, username, text: clean, at: Date.now() };
+    room.chat.push(message);
+    if (room.chat.length > 100) room.chat.shift();
+    room.players.forEach(x => x.socketId && io.to(x.socketId).emit("chatMessage", message));
   });
 
   socket.on("move", ({ code, source, leaveIds = [], pickId = null } = {}) => {
