@@ -65,7 +65,7 @@
   <header class="game-topbar">
     <button id="exitGame" class="back-btn">← <span>Back</span></button>
     <div class="turn-pill"><span id="turnDot" class="turn-dot"></span><strong id="turnBanner">YOUR TURN</strong><span class="timer-pill">⏱ <b id="turnTimer">—</b></span></div>
-    <div class="game-top-actions"><button id="copyGameCode" class="top-icon" title="Copy room code">#<span id="code"></span></button><button id="settingsGame" class="top-icon" title="Settings">⚙</button></div>
+    <div class="game-top-actions"><button id="copyGameCode" class="top-icon" title="Copy room code">#<span id="code"></span></button><button id="settingsGame" class="top-icon" title="Settings">⚙</button><button id="exitGameTop" class="top-icon exit-icon" title="Exit game" aria-label="Exit game">↪</button></div>
   </header>
 
   <main class="game-main">
@@ -126,6 +126,6 @@
 </section>
 
 <script src="/socket.io/socket.io.js"></script>
-<script src="/app.js"></script>
+<script src="/app.js?v=16"></script>
 </body>
 </html>

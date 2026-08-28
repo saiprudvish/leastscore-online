@@ -1,7 +1,7 @@
 let token = localStorage.getItem("ls_token");
 let socket = null, mode = "login", state = null, pendingBots = null;
 let selectedIds = new Set(), selectedSource = null, selectedPickId = null;
-let audioCtx = null, lastTurnKey = null, lastDeclarationKey = null, unreadChat = 0;
+let audioCtx = null, lastTurnKey = null, lastDeclarationKey = null, unreadChat = 0, autoplayEnabled = false, autoplayPending = false;
 
 const $ = id => document.getElementById(id);
 const esc = v => String(v ?? "").replace(/[&<>\"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
@@ -34,6 +34,7 @@ function connect(){
     if(state.status==="playing"&&state.turn===state.me?.username&&prev?.turn!==state.turn)playTurnSound();
     if(state.declaration?.username&&state.declaration.username!==prev?.declaration?.username)playDeclareSound();
     render();
+    if(state.status!=="playing") autoplayPending=false;
   });
   return socket;
 }
@@ -59,8 +60,16 @@ function shareInvite(){if(!state?.code)return;const url=`${location.origin}${loc
 $("shareLobby").onclick=shareInvite;
 $("startGame").onclick=()=>{if(state?.code)whenConnected(()=>socket.emit("startGame",{code:state.code}))};
 $("deal").onclick=()=>{if(state?.code)socket.emit("deal",{code:state.code})};$("resultDeal").onclick=()=>{if(state?.code)socket.emit("deal",{code:state.code})};
-$("resultExit").onclick=()=>{if(state?.code)socket.emit("leaveRoom",{code:state.code});else show("lobby")};
-$("exitGame").onclick=()=>{if(!state?.code)return show("lobby");socket?.emit("leaveRoom",{code:state.code})};
+function leaveCurrentRoom(){
+  const code=state?.code||localStorage.getItem("ls_room");
+  if(!code){localStorage.removeItem("ls_room");resetSelection();show("lobby");return;}
+  const leave=()=>socket.emit("leaveRoom",{code});
+  if(!socket) connect();
+  if(socket?.connected) leave(); else whenConnected(leave);
+}
+$("resultExit").onclick=leaveCurrentRoom;
+$("exitGame").onclick=()=>{if(confirm("Exit this game and return to the lobby?"))leaveCurrentRoom()};
+$("exitGameTop").onclick=()=>{if(confirm("Exit this game and return to the lobby?"))leaveCurrentRoom()};
 $("settingsGame").onclick=()=>toast("Game settings are locked after the round starts.");
 
 function rankValue(r){return r==="A"?1:r==="J"?11:r==="Q"?12:r==="K"?13:Number(r)}
@@ -130,14 +139,71 @@ $("toggleTable").onclick=()=>$("tableDrawer").classList.add("open");$("closeTabl
 function renderResult(){show("result");const d=state.declaration||{};$("resultTitle").textContent=state.status==="gameOver"?"Game over":"Round complete";$("resultWinner").textContent=d.roundWinner?`${esc(d.roundWinner)} won this round`:"Round result";$("resultMessage").textContent=d.reason||(d.winner?`${d.username||d.declarer||"The declarer"} declared successfully.`:`${d.username||d.declarer||"The declarer"} declared and lost.`);$("resultDealTimer").textContent=d?`${secondsLeft(state.dealDeadline)}s`:"";const rows=(d.summary||[]).slice().sort((a,b)=>(a.outcome==="WIN"?-1:1)-(b.outcome==="WIN"?-1:1)||a.score-b.score);$("resultTableBody").innerHTML=rows.map(x=>`<div class="result-row"><b>${esc(x.username)}</b><span>${x.outcome}</span><span>${x.roundScore}</span><span>${x.score}</span></div>`).join("");$("resultDeal").classList.toggle("hidden",!state.canDeal||state.status!=="roundOver")}
 
 function render(){if(!state)return;if(state.status==="lobby"){show("lobby");lobbyRender();return}if(state.status==="roundOver"||state.status==="gameOver"){renderResult();return}show("game");const mine=state.status==="playing"&&state.turn===state.me?.username;$("turnBanner").textContent=mine?"YOUR TURN":`${state.turn||""}'S TURN`;$("turnPill")?.classList.toggle("mine",mine);$("turnDot")?.classList.toggle("mine",mine);$("round").textContent=`R${state.round}`;$("myScore").textContent=state.me?.score??0;$("targetScoreLabel").textContent=state.config?.targetScore??100;$("code").textContent=state.code||"";$("deckCount").textContent=state.deckCount??0;$("hand").innerHTML=(state.me?.hand||[]).map(cardHTML).join("");
-  document.querySelectorAll("#hand .card").forEach(el=>el.onclick=()=>{if(!mine)return toast("Wait for your turn.");if(selectedSource)return toast("Pick source is already selected. Tap Deck/discard again to change it.");const id=el.dataset.id;selectedIds.has(id)?selectedIds.delete(id):selectedIds.add(id);render()});
   renderDiscard();renderPlayers();renderChat();updateSelectionUI();updateTimers();
+  maybeAutoplay();
 }
 
-$("deck").onclick=()=>{if(state?.turn!==state?.me?.username)return toast("Wait for your turn.");const cards=(state.me.hand||[]).filter(c=>selectedIds.has(c.id));if(!validLeavePreview(cards))return toast("Select a valid group to leave first.");selectedSource=selectedSource==="deck"?null:"deck";selectedPickId=null;updateSelectionUI()};
-$("move").onclick=()=>{if(state?.turn!==state?.me?.username)return toast("Wait for your turn.");const cards=(state.me.hand||[]).filter(c=>selectedIds.has(c.id));if(!validLeavePreview(cards))return toast("Invalid group. Use 1 card, a pair, or a valid sequence.");if(!selectedSource)return toast("Choose Deck or a discard card first.");if(selectedSource==="open"&&!selectedPickId)return toast("Choose one discard card.");whenConnected(()=>socket.emit("move",{code:state.code,source:selectedSource,pickId:selectedSource==="open"?selectedPickId:null,leaveIds:[...selectedIds]}))};
-$("declare").onclick=()=>{if(state?.status!=="playing"||state.turn!==state.me?.username)return toast("Declare only on your turn.");whenConnected(()=>socket.emit("declare",{code:state.code}))};
-$("autoplay").onclick=()=>{if(state?.status!=="playing"||state.turn!==state.me?.username)return toast("Autoplay is available on your turn.");whenConnected(()=>socket.emit("autoplay",{code:state.code}))};
+function currentHandSelection(){return (state?.me?.hand||[]).filter(c=>selectedIds.has(c.id));}
+function chooseDeck(){
+  if(state?.status!=="playing"||state.turn!==state.me?.username)return toast("Wait for your turn.");
+  const cards=currentHandSelection();
+  if(!validLeavePreview(cards))return toast("Select a valid group to leave first.");
+  selectedSource=selectedSource==="deck"?null:"deck"; selectedPickId=null; updateSelectionUI();
+}
+function chooseDiscard(id){
+  if(state?.status!=="playing"||state.turn!==state.me?.username)return toast("Wait for your turn.");
+  const cards=currentHandSelection();
+  if(!validLeavePreview(cards))return toast("Select a valid group to leave first.");
+  selectedSource="open"; selectedPickId=id; updateSelectionUI();
+}
+function submitMove(){
+  if(state?.status!=="playing"||state.turn!==state.me?.username)return toast("Wait for your turn.");
+  const cards=currentHandSelection();
+  if(!validLeavePreview(cards))return toast("Invalid group. Use 1 card, a pair, or a valid sequence.");
+  if(!selectedSource)return toast("Choose Deck or a discard card first.");
+  if(selectedSource==="open"&&!selectedPickId)return toast("Choose one discard card.");
+  autoplayPending=false;
+  whenConnected(()=>socket.emit("move",{code:state.code,source:selectedSource,pickId:selectedSource==="open"?selectedPickId:null,leaveIds:[...selectedIds]}));
+}
+function submitDeclare(){
+  if(state?.status!=="playing"||state.turn!==state.me?.username)return toast("Declare only on your turn.");
+  if(!state.roundMovedByMe)return toast("Make your first move before declaring.");
+  whenConnected(()=>socket.emit("declare",{code:state.code}));
+}
+function toggleAutoplay(){
+  autoplayEnabled=!autoplayEnabled; autoplayPending=false;
+  const b=$("autoplay"); if(b){b.classList.toggle("enabled",autoplayEnabled);b.textContent=autoplayEnabled?"⏹ Autoplay ON":"▶ Autoplay";}
+  toast(autoplayEnabled?"Autoplay enabled — your turn will play automatically.":"Autoplay disabled.");
+  maybeAutoplay();
+}
+function maybeAutoplay(){
+  if(!autoplayEnabled||autoplayPending||!state||state.status!=="playing"||state.turn!==state.me?.username)return;
+  autoplayPending=true;
+  setTimeout(()=>{
+    autoplayPending=false;
+    if(!autoplayEnabled||!state||state.status!=="playing"||state.turn!==state.me?.username)return;
+    whenConnected(()=>socket.emit("autoplay",{code:state.code}));
+  },450);
+}
+
+// One delegated handler keeps cards/buttons working even after every state re-render.
+document.addEventListener("click",e=>{
+  const card=e.target.closest?.("#hand .card");
+  if(card){
+    e.preventDefault();
+    if(state?.status!=="playing"||state.turn!==state.me?.username)return toast("Wait for your turn.");
+    const id=card.dataset.id;
+    if(selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
+    // Changing the hand selection invalidates the source until the player confirms it again.
+    selectedSource=null; selectedPickId=null; render(); return;
+  }
+  const open=e.target.closest?.("#open .open-choice");
+  if(open){e.preventDefault();chooseDiscard(open.dataset.pickId);return;}
+});
+$("deck").onclick=chooseDeck;
+$("move").onclick=submitMove;
+$("declare").onclick=submitDeclare;
+$("autoplay").onclick=toggleAutoplay;
 
 const inviteRoom=new URLSearchParams(location.search).get("join");if(inviteRoom&&$("roomCode"))$("roomCode").value=inviteRoom.toUpperCase();
 if(token){show("lobby");fetch("/api/me",{headers:{Authorization:"Bearer "+token}}).then(r=>{if(!r.ok)throw Error();return r.json()}).then(j=>{$("welcome").textContent=j.username;$("welcomeAvatar").textContent=j.username[0]?.toUpperCase()||"C";connect();if(inviteRoom)setTimeout(()=>{whenConnected(()=>socket.emit("joinRoom",{code:inviteRoom.toUpperCase()}))},500)}).catch(()=>{localStorage.removeItem("ls_token");token=null;show("auth")})}
