@@ -518,3 +518,104 @@ body{font-family:'DM Sans',system-ui,sans-serif;font-size:15px}
   #open{width:214px;height:126px}.open-card{padding:0 5px}.open-card #openCard{gap:5px}.open-choice{width:57px;height:84px}.open-face span{font-size:15px}.open-face b{font-size:23px}
   .hand{gap:6px}.card{margin:0}.card.selected{transform:translateY(-14px) scale(1.035)}
 }
+
+/* V14 — mobile-first functional UI overhaul */
+:root{
+  --bg:#071412;
+  --surface:#0d1b1a;
+  --surface2:#122321;
+  --line:#29403b;
+  --gold:#efc568;
+  --gold2:#ffe19a;
+  --muted:#a9b8b2;
+}
+html,body{background:var(--bg);color:var(--ink)}
+.bg{background:radial-gradient(circle at 50% 0%,#15352d 0,#091714 42%,#050c0b 100%)}
+.topbar{background:#071311f2;border-color:#29403b}
+.panel,.auth-card{background:linear-gradient(145deg,#0d1b1aee,#0a1514ee);border-color:#29403b}
+.primary{background:linear-gradient(180deg,#f5cf78,#e6b653);box-shadow:0 7px 18px #0005}
+
+/* The hand is an intentional row of individual cards — never a stacked card. */
+.hand{gap:9px;align-items:flex-end;overflow:visible;padding:3px 4px 0}
+.hand .card{position:relative;z-index:1;width:82px;height:120px;background:#faf7ef;border:2px solid transparent;box-shadow:0 10px 22px #0007;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
+.hand .card:hover{transform:translateY(-5px)}
+.hand .card.selected{transform:translateY(-22px);z-index:10;border-color:var(--gold);box-shadow:0 20px 32px #000b,0 0 0 3px #efc5683d}
+.hand .card.selected::after{content:'✓ SELECTED';position:absolute;left:50%;bottom:-19px;transform:translateX(-50%);white-space:nowrap;font:800 8px "DM Sans",sans-serif;letter-spacing:1px;color:var(--gold2)}
+
+/* Exposed discards are separate selectable cards, not one white container. */
+.open-card{background:#09251f!important;border:1px solid #315149!important;box-shadow:inset 0 0 25px #0006!important}
+#openCard{gap:9px;padding:8px;display:flex;align-items:center;justify-content:center;flex-wrap:nowrap}
+.open-choice{width:62px;height:91px;background:#faf7ef;color:#151b19;border:2px solid #ffffff22;border-radius:10px;box-shadow:0 10px 20px #0009;flex:0 0 auto;cursor:pointer;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}
+.open-choice:hover{transform:translateY(-5px)}
+.open-choice.chosen{transform:translateY(-12px);border-color:var(--gold);box-shadow:0 0 0 3px #efc56842,0 16px 25px #000b}
+.open-choice span{font:900 17px Georgia}.open-choice b{font:900 27px Georgia;display:block;margin-top:4px}
+
+/* Selection is a two-step action: LEAVE first, then PICK. */
+.selection-hint{font-size:13px;min-height:24px;color:#d2d9d5;font-weight:800;letter-spacing:.1px;margin:8px 0 4px;text-align:center}
+#deck.chosen,#open.chosen{outline:3px solid var(--gold);outline-offset:3px;transform:translateY(-8px) scale(1.025)}
+#deck:not(.chosen),#open:not(.chosen){outline:0}
+
+/* Turn is unmistakable and the last five seconds blink in bold. */
+.turn-banner.mine{color:#fff;background:linear-gradient(90deg,#9a762218,#efc56822,#9a762218);border:1px solid #efc56855;box-shadow:0 0 28px #efc5681c;font-size:17px;font-weight:1000;letter-spacing:1.6px}
+#game.my-turn-active .turn-banner.mine{animation:yourTurnPulse 1.2s ease-in-out infinite}
+.timers b.urgent{font-weight:1000;animation:timerBlink .55s steps(2,end) infinite}
+@keyframes yourTurnPulse{50%{box-shadow:0 0 35px #efc56838}}
+
+/* Final/latest move table: all columns fit; only rows scroll. */
+.history table,.mobile-table-wrap table{width:100%;table-layout:fixed;border-collapse:collapse}
+.history th,.history td,.mobile-table-wrap th,.mobile-table-wrap td{white-space:normal;overflow-wrap:anywhere;word-break:break-word;vertical-align:middle}
+.history th:nth-child(1),.history td:nth-child(1),.mobile-table-wrap th:nth-child(1),.mobile-table-wrap td:nth-child(1){width:21%}
+.history th:nth-child(2),.history td:nth-child(2),.mobile-table-wrap th:nth-child(2),.mobile-table-wrap td:nth-child(2){width:31%}
+.history th:nth-child(3),.history td:nth-child(3),.mobile-table-wrap th:nth-child(3),.mobile-table-wrap td:nth-child(3){width:24%}
+.history th:nth-child(4),.history td:nth-child(4),.mobile-table-wrap th:nth-child(4),.mobile-table-wrap td:nth-child(4){width:11%;text-align:center}
+.history th:nth-child(5),.history td:nth-child(5),.mobile-table-wrap th:nth-child(5),.mobile-table-wrap td:nth-child(5){width:13%;text-align:center}
+.latest-turn{background:linear-gradient(90deg,#efc5681f,#efc56808);box-shadow:inset 4px 0 0 var(--gold)}
+.kick-btn{padding:5px 7px;font-size:9px}
+.mobile-table-wrap{overflow-y:auto!important;overflow-x:hidden!important;max-height:100%;width:100%}
+.mobile-table-wrap table{min-width:0!important}
+
+/* More room, larger typography, less clutter. */
+.game-layout{margin-top:22px;gap:18px}
+.history .section-title{font-size:12px}
+.history table{font-size:13px}
+.history th,.history td{padding:10px 7px}
+
+@media(max-width:700px){
+  html,body{overflow-x:hidden!important}
+  #game{height:100dvh;min-height:100dvh;overflow-y:auto;overflow-x:hidden;padding-bottom:18px}
+  .game-layout{height:auto;min-height:calc(100dvh - 54px);overflow:visible;margin:0;padding:6px 9px 22px;display:block}
+  .table{height:auto;min-height:0;overflow:visible;padding:2px 0}
+  .turn-banner{height:34px;font-size:12px}
+  .turn-banner.mine{font-size:15px}
+  .timers{height:24px;font-size:10px}
+  .timers b{font-size:17px}
+  .table-felt{height:225px;min-height:225px;max-height:225px;border-width:5px;margin-top:3px}
+  .piles{gap:17px}
+  .pile{width:86px;height:122px}
+  #open{width:215px;height:135px}
+  #openCard{gap:6px}
+  .open-choice{width:49px;height:74px}
+  .open-choice span{font-size:14px}.open-choice b{font-size:21px}
+  .my-area{padding-top:10px}
+  .my-head{font-size:13px;margin-bottom:7px}
+  .hand{height:140px;min-height:140px;max-height:none;gap:5px;padding:6px 1px 0}
+  .hand .card{width:calc((100vw - 40px)/5);max-width:70px;height:103px}
+  .card .corner{font-size:14px}.card .suit{font-size:18px}.card .big{font-size:28px}
+  .hand .card.selected{transform:translateY(-19px) scale(1.025)}
+  .hand .card.selected::after{bottom:-17px;font-size:7px}
+  .selection-hint{font-size:11px;min-height:28px;margin:6px 0 2px}
+  .actions{height:48px;gap:8px;margin-top:4px}
+  .actions .declare,.actions .move{height:44px;width:50%;min-width:0;font-size:13px;border-radius:12px}
+  .mobile-history{display:block;height:auto;min-height:0;max-height:300px;margin-top:13px;padding:11px!important;overflow:hidden!important}
+  .mobile-history .section-title{font-size:11px!important;margin-bottom:8px}
+  .mobile-table-wrap{max-height:240px;overflow-y:auto!important;overflow-x:hidden!important}
+  .mobile-table-wrap table{font-size:11px!important}
+  .mobile-table-wrap th,.mobile-table-wrap td{padding:8px 4px!important}
+  .mobile-history .kick-btn{font-size:8px;padding:4px 5px}
+  .deal-panel{margin-top:10px;height:auto;padding:9px;font-size:11px}
+  .deal-panel .primary{font-size:11px;padding:8px 10px}
+  .gamebar .room-pill{display:none}
+  .gamebar .brand{font-size:21px}
+  .game-actions .score-mini{font-size:10px}
+  .game-actions .exit-game{font-size:11px;padding:8px 11px}
+}

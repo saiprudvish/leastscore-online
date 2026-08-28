@@ -20,9 +20,9 @@ function toast(msg) {
 }
 function show(which) { ["auth", "lobby", "game", "result"].forEach(x => $(x)?.classList.toggle("hidden", x !== which)); }
 function ensureAudio() { try { audioCtx ||= new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx.state === "suspended") audioCtx.resume(); } catch {} }
-function ping(freq=740,duration=.16,volume=.11) { ensureAudio(); if (!audioCtx) return; try { const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type="sine"; o.frequency.value=freq; g.gain.setValueAtTime(volume,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+duration); o.connect(g).connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+duration); } catch {} }
-function playTurnSound(){ ping(660,.16,.13); setTimeout(()=>ping(880,.18,.14),110); setTimeout(()=>ping(1040,.22,.11),240); }
-function playDeclareSound(){ ping(520,.18,.13); setTimeout(()=>ping(760,.18,.14),120); setTimeout(()=>ping(980,.22,.12),250); }
+function ping(freq=740,duration=.18,volume=.26) { ensureAudio(); if (!audioCtx) return; try { const o=audioCtx.createOscillator(), g=audioCtx.createGain(); o.type="triangle"; o.frequency.value=freq; g.gain.setValueAtTime(volume,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+duration); o.connect(g).connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+duration); } catch {} }
+function playTurnSound(){ ping(620,.22,.30); setTimeout(()=>ping(820,.24,.30),130); setTimeout(()=>ping(1040,.28,.27),270); }
+function playDeclareSound(){ ping(480,.24,.30); setTimeout(()=>ping(700,.24,.30),130); setTimeout(()=>ping(920,.30,.27),270); }
 document.addEventListener("pointerdown", ensureAudio, {once:true});
 async function api(url, body) {
   const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -69,6 +69,11 @@ function connect() {
     }
     const previousTurn = previous?.turn;
     const currentTurn = state.turn;
+    // A completed move starts a new turn. Drop all old UI selections so a
+    // previous move can never leak into the next turn.
+    if (previousTurn !== currentTurn || state.status !== "playing") {
+      selectedIds.clear(); selectedSource = null; selectedPickId = null;
+    }
     if (state.status === "playing" && currentTurn === state.me?.username && previousTurn !== currentTurn) playTurnSound();
     const previousDeclaration = previous?.declaration?.username;
     const currentDeclaration = state.declaration?.username;
@@ -106,7 +111,9 @@ function privateConfigFromUI() {
   };
 }
 function createRoom(config, startBots = false) {
-  state = null;
+  localStorage.removeItem("ls_room");
+  state = null; selectedIds.clear(); selectedSource = null; selectedPickId = null;
+
   pendingBots = startBots ? { code: null, count: Number($("botCount").value), config, sent: false } : null;
   whenConnected(() => socket.emit("createRoom", { config }));
 }
@@ -152,8 +159,9 @@ $("resultDeal").onclick = () => { if (state?.code) whenConnected(() => socket.em
 $("resultExit").onclick = () => { if (!state?.code) return show("lobby"); if (confirm("Exit this game?")) socket?.emit("leaveRoom", { code: state.code }); };
 $("exitGame").onclick = () => {
   if (!state?.code) return show("lobby");
-  const ok = confirm("Exit this game? You can create or join another game afterwards.");
-  if (!ok) return;
+  // Exit is intentionally immediate so a solo game can always be left and a
+  // refresh cannot force the player back into it.
+
   if (socket?.connected) socket.emit("leaveRoom", { code: state.code });
   else { localStorage.removeItem("ls_room"); state = null; show("lobby"); renderLobbyDefaults(); }
 };
@@ -166,35 +174,17 @@ function rankValue(r) { return r === "A" ? 1 : r === "J" ? 11 : r === "Q" ? 12 :
 function validLeavePreview(cards) {
   if (!cards.length) return false;
   if (cards.length === 1) return true;
-
-  // Even same-rank groups only: 2 or 4.
-  if ((cards.length === 2 || cards.length === 4) &&
-      cards.every(c => c.rank === cards[0].rank)) {
-    return true;
-  }
-
-  // Odd-length rank sequence; suits are intentionally ignored.
-  // Supports 234, 456, 8910, 10JQ, QKA, A2345, 10JQKA.
-  if (cards.length >= 3 && cards.length % 2 === 1) {
+  if ((cards.length === 2 || cards.length === 4) && cards.every(c => c.rank === cards[0].rank)) return true;
+  if (cards.length >= 3) {
     const vals = cards.map(c => rankValue(c.rank)).sort((a,b) => a-b);
     if (new Set(vals).size !== vals.length) return false;
-
     if (vals.includes(1) && vals.includes(13)) {
-      if (vals.length === 3 &&
-          vals[0] === 1 && vals[1] === 12 && vals[2] === 13) {
-        return true;
-      }
-      return vals.length === 5 &&
-             vals.join(",") === "1,10,11,12,13";
+      return (vals.length === 3 && vals.join(',') === '1,12,13') ||
+             (vals.length === 5 && vals.join(',') === '1,10,11,12,13');
     }
-
-    if (vals[0] === 1) {
-      return vals.every((v,i) => v === i + 1);
-    }
-
+    if (vals[0] === 1) return vals.every((v,i) => v === i + 1);
     return vals.every((v,i) => i === 0 || v === vals[i-1] + 1);
   }
-
   return false;
 }
 function secondsLeft(deadline) {
@@ -227,44 +217,37 @@ setInterval(updateTimers, 200);
 function renderOpenSelectionOnly() {
   document.querySelectorAll("[data-pick-id]").forEach(el => el.classList.toggle("chosen", selectedPickId === el.dataset.pickId));
 }
+function selectionPhase() {
+  return selectedSource ? 'pick' : 'leave';
+}
 function updateSelectionHint() {
   const el = $("selectionHint");
   if (!el) return;
   const cards = (state?.me?.hand || []).filter(c => selectedIds.has(c.id));
-  const labels = cards.map(cardLabel).join("  ");
-  if (!selectedSource) el.textContent = selectedIds.size ? `Leaving ${labels}` : "Select cards to leave";
-  else if (selectedSource === "deck") el.textContent = selectedIds.size ? `Leaving ${labels} • Deck` : "Deck selected";
-  else el.textContent = selectedPickId ? (selectedIds.size ? `Leaving ${labels} • Pick ${cardLabel((state.openCards || []).find(c=>c.id===selectedPickId))}` : `Pick ${cardLabel((state.openCards || []).find(c=>c.id===selectedPickId))}`) : "Choose a discard card";
+  const labels = cards.map(cardLabel).join('  ');
+  if (!selectedSource) el.textContent = cards.length ? `Leaving: ${labels}  •  Now choose what to pick` : '1) Select cards to leave';
+  else if (selectedSource === 'deck') el.textContent = cards.length ? `Leaving: ${labels}  •  Pick: Deck` : 'Pick: Deck';
+  else {
+    const picked = (state.openCards || []).find(c => c.id === selectedPickId);
+    el.textContent = picked ? `Leaving: ${labels}  •  Pick: ${cardLabel(picked)}` : 'Pick one discard card';
+  }
 }
 function updateMoveUI() {
-  const myTurn = state?.status === "playing" && state?.turn === state?.me?.username;
-  const move = $("move");
-  const declare = $("declare");
-  const deck = $("deck");
-  const open = $("open");
-  const count = selectedIds.size;
-
+  const myTurn = state?.status === 'playing' && state?.turn === state?.me?.username;
+  const cards = (state?.me?.hand || []).filter(c => selectedIds.has(c.id));
+  const valid = validLeavePreview(cards);
+  const move = $("move"), declare = $("declare"), deck = $("deck"), open = $("open");
   if (move) {
-    move.disabled = !myTurn || !selectedSource || count === 0;
-    move.textContent = "Move";
+    move.disabled = !myTurn || !valid || !selectedSource || (selectedSource === 'open' && !selectedPickId);
+    move.textContent = 'Move';
   }
-
-  if (declare) {
-    // Keep exactly two action choices visible: Declare and Move.
-    // The server decides whether Declare is legal; on the first turn it
-    // returns a friendly error instead of hiding/changing the button.
-    declare.disabled = !myTurn;
-    declare.textContent = "Declare";
-  }
-
-  deck?.classList.toggle("chosen", selectedSource === "deck");
-  open?.classList.toggle("chosen", selectedSource === "open");
-
-  if ($("handStatus") && state?.me) {
-    $("handStatus").textContent = `${count ? count + " selected • " : ""}${state.me.hand.length} cards`;
-  }
+  if (declare) { declare.disabled = !myTurn; declare.textContent = 'Declare'; }
+  deck?.classList.toggle('chosen', selectedSource === 'deck');
+  open?.classList.toggle('chosen', selectedSource === 'open');
+  if ($('handStatus') && state?.me) $('handStatus').textContent = `${cards.length ? cards.length + ' selected • ' : ''}${state.me.hand.length} cards`;
   updateSelectionHint();
-}function lobbyRender() {
+}
+function lobbyRender() {
   $("lobbyRoom")?.classList.toggle("hidden", !state.code);
   $("create")?.classList.toggle("hidden", !!state.code);
   if (!state.code) return;
@@ -350,60 +333,73 @@ function renderResult() {
 }
 function render() {
   if (!state) return;
-  if (state.status === "lobby") { show("lobby"); lobbyRender(); return; }
-  if (state.status === "roundOver" || state.status === "gameOver") { renderResult(); return; }
-  show("game");
-  $("game").classList.toggle("my-turn", state.status === "playing" && state.turn === state.me?.username);
-  $("code").textContent = state.code; $("round").textContent = `R${state.round}`; $("myScore").textContent = state.me?.score ?? 0; $("targetScoreLabel").textContent = `Target ${state.config.targetScore}`;
-  const mine = state.turn === state.me?.username;
-  document.body.classList.toggle("my-turn-active", mine);
-  $("turnBanner").textContent = state.status === "checking" ? `⚑ ${state.declaration.username} declared — checking…` : state.status === "roundOver" ? `Round complete • ${state.dealBy} deals next` : state.status === "gameOver" ? "Game over" : mine ? "● Your turn" : `● ${state.turn}'s turn`;
-  $("turnBanner").classList.toggle("mine", mine);
+  if (state.status === 'lobby') { show('lobby'); lobbyRender(); return; }
+  if (state.status === 'roundOver' || state.status === 'gameOver') { renderResult(); return; }
+  show('game');
+  const mine = state.status === 'playing' && state.turn === state.me?.username;
+  $("game").classList.toggle('my-turn', mine);
+  document.body.classList.toggle('my-turn-active', mine);
+  $("code").textContent = state.code;
+  $("round").textContent = `R${state.round}`;
+  $("myScore").textContent = state.me?.score ?? 0;
+  $("targetScoreLabel").textContent = `Target ${state.config.targetScore}`;
+  $("turnBanner").textContent = mine ? '● YOUR TURN' : `● ${state.turn}'s turn`;
+  $("turnBanner").classList.toggle('mine', mine);
 
-  $("openCard").innerHTML = (state.openCards || []).length ? (state.openCards || []).map(c => `<div class="open-choice ${selectedPickId === c.id ? "chosen" : ""}" data-pick-id="${c.id}"><div class="open-face"><span>${c.rank}</span><b>${c.suit}</b></div></div>`).join("") : `<div class="open-empty">—</div>`;
   if (selectedPickId && !(state.openCards || []).some(c => c.id === selectedPickId)) selectedPickId = null;
+  $("openCard").innerHTML = (state.openCards || []).length
+    ? state.openCards.map(c => `<button type="button" class="open-choice ${selectedPickId === c.id ? 'chosen' : ''}" data-pick-id="${c.id}"><span>${c.rank}</span><b>${c.suit}</b></button>`).join('')
+    : '<div class="open-empty">No discard</div>';
   $("deckCount").textContent = state.deckCount;
-  document.querySelectorAll("[data-pick-id]").forEach(el => el.onclick = () => { if (!mine) return toast("Wait for your turn."); selectedSource="open"; selectedPickId = selectedPickId === el.dataset.pickId ? null : el.dataset.pickId; updateMoveUI(); renderOpenSelectionOnly(); });
-  $("hand").innerHTML = (state.me?.hand || []).map(cardHTML).join("");
-  document.querySelectorAll("#hand .card").forEach(el => el.onclick = () => {
-    if (!mine) return toast("Wait for your turn.");
+  document.querySelectorAll('[data-pick-id]').forEach(el => el.onclick = (event) => {
+    event.stopPropagation();
+    if (!mine) return toast('Wait for your turn.');
+    if (!selectedIds.size || !validLeavePreview((state.me?.hand || []).filter(c => selectedIds.has(c.id)))) return toast('First finish selecting the cards you want to leave.');
+    selectedSource = 'open'; selectedPickId = el.dataset.pickId; updateMoveUI(); renderOpenSelectionOnly();
+  });
+
+  $("hand").innerHTML = (state.me?.hand || []).map(cardHTML).join('');
+  document.querySelectorAll('#hand .card').forEach(el => el.onclick = () => {
+    if (!mine) return toast('Wait for your turn.');
+    if (selectedSource) return toast('You already chose what to pick. Change the pick first if needed.');
     const id = el.dataset.id;
     selectedIds.has(id) ? selectedIds.delete(id) : selectedIds.add(id);
-    // IMPORTANT: do not validate partial selections here. A valid 3/5-card group
-    // necessarily passes through temporarily invalid 2/4-card selections.
     render();
   });
+
   renderPlayers(); renderHistoryTable();
-  if ($("roundSide")) $("roundSide").textContent = state.round || "";
-  if ($("targetSide")) $("targetSide").textContent = state.config?.targetScore ?? "";
-  if ($("scoreSide")) $("scoreSide").textContent = state.me?.score ?? 0;
-  if ($("cardsSide")) $("cardsSide").textContent = state.me?.hand?.length ?? 0;
-  $("log").innerHTML = (state.log || []).slice(-8).map(x => `<div class="logline">${x.msg}</div>`).join("");
-  const result = $("roundResult");
-  if (state.status === "roundOver" || state.status === "gameOver") {
-    const rows = (state.declaration?.summary || []).map(x => `<tr><td>${x.username}</td><td>${x.roundScore}</td><td>${x.score}</td></tr>`).join("");
-    result.classList.remove("hidden");
-    result.innerHTML = `<b>${state.declaration?.winner ? "Declaration wins" : "Declaration loses (+25)"}</b><table><tr><th>Player</th><th>Round</th><th>Total</th></tr>${rows}</table>`;
-  } else result.classList.add("hidden");
-  $("dealPanel").classList.toggle("hidden", !state.canDeal);
+  if ($('roundSide')) $('roundSide').textContent = state.round || '';
+  if ($('targetSide')) $('targetSide').textContent = state.config?.targetScore ?? '';
+  if ($('scoreSide')) $('scoreSide').textContent = state.me?.score ?? 0;
+  if ($('cardsSide')) $('cardsSide').textContent = state.me?.hand?.length ?? 0;
+  $("log").innerHTML = (state.log || []).slice(-8).map(x => `<div class="logline">${x.msg}</div>`).join('');
+  $("dealPanel").classList.toggle('hidden', !state.canDeal);
   $("deal").disabled = !state.canDeal;
   updateMoveUI(); updateTimers();
 }
-$("deck").onclick = () => { if (state?.turn !== state?.me?.username) return toast("Wait for your turn."); selectedSource = selectedSource === "deck" ? null : "deck"; selectedPickId = null; updateMoveUI(); };
-$("open").onclick = () => { if (state?.turn !== state?.me?.username) return toast("Wait for your turn."); selectedSource = "open"; updateMoveUI(); };
-$("open").onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("open").click(); } };
-$("move").onclick = () => {
-  if (state?.turn !== state?.me?.username) return toast("Wait for your turn.");
-  if (!selectedSource) return toast("Choose Deck or a discard card.");
-  if (selectedSource === "open" && !selectedPickId) return toast("Choose the discard card you want.");
+$("deck").onclick = () => {
+  if (state?.turn !== state?.me?.username) return toast('Wait for your turn.');
   const cards = (state.me?.hand || []).filter(c => selectedIds.has(c.id));
-  if (!cards.length) return toast("Select at least one card to leave.");
-  if (!validLeavePreview(cards)) return toast("Invalid leave. Try a pair or a valid sequence.");
-  whenConnected(() => socket.emit("move", { code: state.code, source: selectedSource, pickId: selectedSource === "open" ? selectedPickId : null, leaveIds: [...selectedIds] }));
+  if (!validLeavePreview(cards)) return toast('First select a valid group of cards to leave.');
+  selectedSource = selectedSource === 'deck' ? null : 'deck'; selectedPickId = null; updateMoveUI();
+};
+$("open").onclick = () => {
+  if (state?.turn !== state?.me?.username) return toast('Wait for your turn.');
+  const cards = (state.me?.hand || []).filter(c => selectedIds.has(c.id));
+  if (!validLeavePreview(cards)) return toast('First select a valid group of cards to leave.');
+  selectedSource = 'open'; selectedPickId = null; updateMoveUI();
+};
+$("move").onclick = () => {
+  if (state?.turn !== state?.me?.username) return toast('Wait for your turn.');
+  const cards = (state.me?.hand || []).filter(c => selectedIds.has(c.id));
+  if (!validLeavePreview(cards)) return toast('Invalid leave. Use a card, pair, or consecutive sequence.');
+  if (!selectedSource) return toast('Now choose Deck or one discard card.');
+  if (selectedSource === 'open' && !selectedPickId) return toast('Choose one discard card.');
+  whenConnected(() => socket.emit('move', { code: state.code, source: selectedSource, pickId: selectedSource === 'open' ? selectedPickId : null, leaveIds: [...selectedIds] }));
 };
 $("declare").onclick = () => {
-  if (state?.status !== "playing" || state?.turn !== state?.me?.username) return toast("Wait for your turn.");
-  whenConnected(() => socket.emit("declare", { code: state.code }));
+  if (state?.status !== 'playing' || state?.turn !== state?.me?.username) return toast('Wait for your turn.');
+  whenConnected(() => socket.emit('declare', { code: state.code }));
 };
 
 function joinRoomFromInvite(code) { const clean=String(code||"").trim().toUpperCase(); if(clean) whenConnected(()=>socket.emit("joinRoom",{code:clean})); }
