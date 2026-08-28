@@ -1,31 +1,131 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>LeastScore • Online Card Game</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#080b12">
+<title>LeastScore</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
 </head>
-<body><div class="bg"></div><div id="toast"></div><div id="settingsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle"><div class="modal-card"><button id="closeSettings" class="modal-close" aria-label="Close">×</button><div class="eyebrow">PRIVATE GAME</div><h2 id="settingsTitle">Game settings</h2><p class="muted">Choose the rules before creating your private room.</p><div class="modal-grid"><label>Target score<select id="privateTarget"><option value="50">50</option><option value="100" selected>100</option><option value="150">150</option></select></label><label>Turn time<select id="privateTurn"><option value="10">10 sec</option><option value="15" selected>15 sec</option><option value="20">20 sec</option><option value="25">25 sec</option><option value="30">30 sec</option></select></label><label>Deal time<select id="privateDeal"><option value="5">5 sec</option><option value="10">10 sec</option><option value="15" selected>15 sec</option><option value="20">20 sec</option><option value="25">25 sec</option><option value="30">30 sec</option></select></label></div><button id="createWithSettings" class="primary wide">Create private game</button></div></div>
-<section id="auth" class="screen"><div class="auth-card"><div class="brand">♠ Least<span>Score</span></div><p class="tag">The lowest score survives. Play live with friends or bots.</p><div class="tabs"><button class="tab active" data-mode="login">Login</button><button class="tab" data-mode="register">Create account</button></div><input id="username" placeholder="Username" autocomplete="username"><input id="password" type="password" placeholder="Password" autocomplete="current-password"><button id="authBtn" class="primary">Enter the table</button><p id="authMsg" class="muted"></p></div></section>
+<body>
+<div class="bg" aria-hidden="true"></div>
+<div id="toast"></div>
 
-<section id="lobby" class="screen hidden"><header class="topbar"><div class="brand small">♠ Least<span>Score</span></div><div><span id="welcome"></span><button id="logout" class="ghost">Log out</button></div></header><div class="lobby-wrap">
-<div class="hero"><div><p class="eyebrow">ONLINE TABLE</p><h1>Make the lowest<br><em>score</em> win.</h1><p>Invite friends, deal five cards and outsmart the table.</p></div><div class="hero-card">A♦<small>1 point</small></div></div>
-<div class="room-grid"><div class="panel mode-card create-card"><div class="mode-icon">♠</div><h2>Play with friends</h2><p>Create a private room and invite friends.</p><button id="create" class="primary">＋ Create private game</button><div id="lobbyRoom" class="inline-room hidden"><div class="private-code-label">ROOM CODE</div><div class="room-code" id="roomCodeDisplay">-----</div><div class="muted" id="roomConfig"></div><div class="lobby-actions"><button id="copyLobbyCode" class="ghost">Copy code</button><button id="shareLobby" class="ghost">Share invite</button></div><div id="lobbyStatus" class="lobby-status muted"></div><div id="lobbyPlayers" class="lobby-players"></div><button id="startGame" class="primary start-inline">Start game</button></div></div><div class="panel mode-card"><div class="mode-icon bot">✦</div><h2>Play with bots</h2><p>Fill the table with bots and start immediately.</p><div class="bot-setup"><select id="botCount"><option value="1">1 bot · 2 players</option><option value="2">2 bots · 3 players</option><option value="3" selected>3 bots · 4 players</option><option value="4">4 bots · 5 players</option><option value="5">5 bots · 6 players</option></select><button id="playBots" class="primary">Play solo</button></div></div><div class="panel join-card"><h2>Join a friend</h2><p>Enter the room code your friend sent you.</p><div class="join"><input id="roomCode" maxlength="5" placeholder="ABCDE"><button id="join" class="primary">Join</button></div></div></div>
-</div></section>
-
-<section id="game" class="hidden"><header class="topbar gamebar"><div class="brand small">♠ Least<span>Score</span></div><div class="room-pill">ROOM <b id="code"></b><button id="copyGameCode">Copy</button></div><div class="game-actions"><div class="score-mini">Score <b id="myScore">0</b> <span id="targetScoreLabel"></span></div><button id="exitGame" class="ghost exit-game">Back</button></div></header>
-<main class="game-layout"><aside class="side left"><div class="panel players"><div class="section-title">TABLE <span id="round"></span></div><div id="players"></div></div><div class="panel history"><div class="section-title">LATEST MOVE • TOTAL SCORE</div><table><thead><tr><th>Name</th><th>Left</th><th>Picked</th><th>Score</th><th>Kick</th></tr></thead><tbody id="historyTableBody"></tbody></table></div></aside>
-<section class="table"><div id="turnBanner" class="turn-banner">Waiting…</div><div class="timers"><span class="turn-time-label">TIME <b id="turnTimer">—</b></span></div><div class="table-felt"><div class="felt-glow"></div><div class="piles"><button id="deck" class="pile deck-card"><span>♠</span><small>DECK</small><b id="deckCount">39</b></button><div id="open" class="pile open-card" role="button" tabindex="0"><div id="openCard"></div><small>DISCARD</small></div></div></div><div class="my-area"><div class="my-head"><span>Your hand</span><span id="handStatus">5 cards</span></div><div id="hand" class="hand"></div><div id="selectionHint" class="selection-hint">1) Select cards to leave  •  2) Choose Deck or one discard card</div><div class="actions"><button id="declare" class="declare" disabled>⚑ Declare</button><button id="move" class="primary move" disabled>Move</button></div></div><div id="dealPanel" class="deal-panel hidden"><span>Next round is ready</span><button id="deal" class="primary">Deal next round</button></div><div class="mobile-history panel"><div class="section-title">LATEST MOVE • TOTAL SCORE</div><div id="mobileHistory"></div></div></section>
-<aside class="side right">
-<div class="panel round-info compact-status">
-  <div class="section-title">ROUND <span id="roundSide"></span></div>
-  <div class="status-line"><span>Target</span><b id="targetSide">100</b></div>
-  <div class="status-line"><span>Your score</span><b id="scoreSide">0</b></div>
-  <div class="status-line"><span>Cards</span><b id="cardsSide">5</b></div>
+<!-- PRIVATE GAME SETTINGS -->
+<div id="settingsModal" class="modal hidden" role="dialog" aria-modal="true">
+  <div class="modal-card">
+    <button id="closeSettings" class="icon-btn modal-close" aria-label="Close">×</button>
+    <div class="eyebrow">PRIVATE GAME</div>
+    <h2>Game settings</h2>
+    <p class="muted">Set the table rules before inviting friends.</p>
+    <div class="modal-grid">
+      <label>Target score<select id="privateTarget"><option value="50">50</option><option value="100" selected>100</option><option value="150">150</option></select></label>
+      <label>Turn time<select id="privateTurn"><option value="10">10 sec</option><option value="15" selected>15 sec</option><option value="20">20 sec</option><option value="25">25 sec</option><option value="30">30 sec</option></select></label>
+      <label>Deal time<select id="privateDeal"><option value="5">5 sec</option><option value="10">10 sec</option><option value="15" selected>15 sec</option><option value="20">20 sec</option><option value="25">25 sec</option><option value="30">30 sec</option></select></label>
+    </div>
+    <button id="createWithSettings" class="primary wide">Create private game</button>
+  </div>
 </div>
-<div id="log" class="panel compact-log"></div>
-</aside></main></section>
 
-<section id="result" class="hidden result-screen"><header class="topbar"><div class="brand small">♠ Least<span>Score</span></div><div class="room-pill">ROOM <b id="resultCode"></b></div><button id="resultExit" class="ghost exit-game">Back to lobby</button></header><main class="result-wrap"><div class="result-hero"><p class="eyebrow">ROUND RESULT</p><h1 id="resultTitle">Round complete</h1><h2 id="resultWinner">Winner</h2><p id="resultMessage" class="muted"></p></div><div class="panel result-card"><div class="result-head"><div><div class="section-title">SCORES</div><p class="muted">Updated total scores after the declaration.</p></div><div class="deal-count">Next round starts automatically in <b id="resultDealTimer"></b></div></div><div class="result-table-wrap"><table><thead><tr><th>Player</th><th>Result</th><th>Round score</th><th>Total score</th></tr></thead><tbody id="resultTableBody"></tbody></table></div><div class="result-actions"><button id="resultDeal" class="primary">Deal next round</button></div></div></main></section>
-<script src="/socket.io/socket.io.js"></script><script src="/app.js"></script></body></html>
+<!-- AUTH -->
+<section id="auth" class="screen auth-screen">
+  <div class="auth-card">
+    <div class="logo-lockup"><div class="logo-cards">A♠ A♦ A♣</div><div class="brand">LEAST<span>SCORE</span></div></div>
+    <p class="tag">THE CARD GAME WHERE LESS WINS</p>
+    <div class="auth-tabs"><button class="tab active" data-mode="login">Login</button><button class="tab" data-mode="register">Sign up</button></div>
+    <input id="username" placeholder="Username" autocomplete="username">
+    <input id="password" type="password" placeholder="Password" autocomplete="current-password">
+    <button id="authBtn" class="primary wide">Enter the table</button>
+    <p id="authMsg" class="muted auth-msg"></p>
+  </div>
+</section>
+
+<!-- LOBBY -->
+<section id="lobby" class="screen hidden">
+  <header class="topbar">
+    <div class="brand mini">♠ LEAST<span>SCORE</span></div>
+    <div class="user-chip"><span class="avatar-sm" id="welcomeAvatar">C</span><span id="welcome"></span><button id="logout" class="icon-btn">↪</button></div>
+  </header>
+  <main class="lobby-main">
+    <div class="lobby-hero"><div><div class="eyebrow">WELCOME TO THE TABLE</div><h1>Play smart.<br><span>Score less.</span></h1><p>Invite friends or sharpen your game against bots.</p></div><div class="hero-stack" aria-hidden="true"><div class="mini-card c1">A♦</div><div class="mini-card c2">8♣</div><div class="mini-card c3">Q♠</div></div></div>
+    <div class="mode-grid">
+      <article class="mode-card friends"><div class="mode-icon">♠</div><h2>Play with friends</h2><p>Create or join a private table.</p><button id="create" class="primary">Create private game</button>
+        <div id="lobbyRoom" class="room-created hidden"><div class="room-code-label">ROOM CODE</div><div id="roomCodeDisplay" class="room-code">-----</div><div id="roomConfig" class="muted"></div><div class="room-actions"><button id="copyLobbyCode" class="secondary">Copy code</button><button id="shareLobby" class="secondary">Share invite</button></div><div id="lobbyStatus" class="lobby-status"></div><div id="lobbyPlayers" class="lobby-players"></div><button id="startGame" class="primary wide">Start game</button></div>
+      </article>
+      <article class="mode-card bots"><div class="mode-icon">🤖</div><h2>Play with AI</h2><p>Practice against smart bots.</p><div class="bot-row"><select id="botCount"><option value="1">1 bot · 2 players</option><option value="2">2 bots · 3 players</option><option value="3" selected>3 bots · 4 players</option><option value="4">4 bots · 5 players</option><option value="5">5 bots · 6 players</option></select><button id="playBots" class="primary">Start</button></div></article>
+      <article class="mode-card join-card"><div class="mode-icon">⌁</div><h2>Join a friend</h2><p>Enter the five-character room code.</p><div class="join-row"><input id="roomCode" maxlength="5" placeholder="ABCDE"><button id="join" class="primary">Join</button></div></article>
+    </div>
+  </main>
+</section>
+
+<!-- GAME -->
+<section id="game" class="game-screen hidden">
+  <header class="game-topbar">
+    <button id="exitGame" class="back-btn">← <span>Back</span></button>
+    <div class="turn-pill"><span id="turnDot" class="turn-dot"></span><strong id="turnBanner">YOUR TURN</strong><span class="timer-pill">⏱ <b id="turnTimer">—</b></span></div>
+    <div class="game-top-actions"><button id="copyGameCode" class="top-icon" title="Copy room code">#<span id="code"></span></button><button id="settingsGame" class="top-icon" title="Settings">⚙</button></div>
+  </header>
+
+  <main class="game-main">
+    <section class="score-strip">
+      <div><span>ROUND</span><b id="round">R1</b></div>
+      <div><span>YOUR SCORE</span><b id="myScore">0</b></div>
+      <div><span>TARGET</span><b id="targetScoreLabel">100</b></div>
+      <div class="players-mini"><span id="playerCountLabel">PLAYERS</span><b id="scorePlayers">—</b></div>
+    </section>
+
+    <section class="table-zone">
+      <div class="table-felt">
+        <div class="felt-ring"></div>
+        <div class="table-caption"><span>DRAW</span><span>DISCARD</span></div>
+        <div class="piles">
+          <button id="deck" class="deck-pile" type="button" aria-label="Draw from deck"><div class="deck-art">♠</div><span class="pile-label">DECK</span><b id="deckCount">39</b></button>
+          <div id="open" class="discard-pile" aria-label="Discard cards"></div>
+        </div>
+        <div class="turn-tip" id="selectionHint">Select the cards you want to leave first</div>
+      </div>
+    </section>
+
+    <section class="hand-section">
+      <div class="hand-header"><div><span class="eyebrow">YOUR HAND</span><strong id="handStatus">5 CARDS</strong></div><span id="selectionCount" class="selection-count"></span></div>
+      <div id="hand" class="hand" aria-label="Your cards"></div>
+    </section>
+
+    <section class="action-bar">
+      <button id="autoplay" class="action autoplay">▶ Autoplay</button>
+      <button id="declare" class="action declare" disabled>♛ Declare</button>
+      <button id="move" class="action move" disabled>➜ Make Move</button>
+    </section>
+
+    <section class="mobile-table-status">
+      <div class="status-heading"><span>TABLE</span><button id="toggleTable" class="tiny-link">Players & moves</button></div>
+      <div id="mobileTableRows"></div>
+    </section>
+  </main>
+
+  <button id="chatToggle" class="chat-fab" aria-label="Open chat"><span>▱</span><i id="chatBadge" class="hidden">0</i></button>
+
+  <aside id="chatPanel" class="chat-panel" aria-hidden="true">
+    <div class="chat-head"><div><strong>Table chat</strong><small>Messages stay with this room</small></div><button id="closeChat" class="icon-btn">×</button></div>
+    <div id="chatMessages" class="chat-messages"></div>
+    <div class="chat-compose"><input id="chatInput" maxlength="180" placeholder="Chat during the match…"><button id="sendChat" class="send-btn">➤</button></div>
+  </aside>
+
+  <aside id="tableDrawer" class="table-drawer" aria-hidden="true">
+    <div class="drawer-head"><strong>Table & moves</strong><button id="closeTable" class="icon-btn">×</button></div>
+    <div id="drawerPlayers"></div>
+  </aside>
+</section>
+
+<!-- RESULT -->
+<section id="result" class="result-screen hidden">
+  <header class="topbar"><div class="brand mini">♠ LEAST<span>SCORE</span></div><button id="resultExit" class="secondary">Back to lobby</button></header>
+  <main class="result-wrap"><div class="result-hero"><div class="eyebrow">ROUND RESULT</div><h1 id="resultTitle">Round complete</h1><h2 id="resultWinner">Winner</h2><p id="resultMessage" class="muted"></p></div><div class="result-card"><div class="result-head"><span>NEXT ROUND</span><b id="resultDealTimer"></b></div><div id="resultTableBody" class="result-list"></div><button id="resultDeal" class="primary wide">Start next round</button></div></main>
+</section>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
