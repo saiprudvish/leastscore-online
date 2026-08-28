@@ -17,7 +17,10 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: true, credentials: true } });
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, "public"), {
+  etag: false,
+  setHeaders(res) { res.setHeader("Cache-Control", "no-store, max-age=0"); }
+}));
 
 function saveUsers() { fs.writeFileSync(DATA_FILE, JSON.stringify(users, null, 2)); }
 function tokenFor(username) { return jwt.sign({ username }, JWT_SECRET, { expiresIn: "30d" }); }
@@ -494,9 +497,8 @@ io.on("connection", socket => {
     if (!p || p.eliminated || room.players[room.turn]?.username !== username) return socket.emit("errorMsg", "Autoplay is available only on your turn.");
     const leaving = bestLeaveGroup(p.hand);
     if (!leaving.length) return socket.emit("errorMsg", "No legal move is available.");
-    const source = botTakeChoice(room, p);
-    const pick = source === "open" ? (room.open[0] || null) : null;
-    if (!performMove(room, p, source, leaving, true, pick?.id || null)) socket.emit("errorMsg", "Autoplay could not complete the move.");
+    const source = "deck";
+    if (!performMove(room, p, source, leaving, true, null)) socket.emit("errorMsg", "Autoplay could not complete the move.");
   });
 
   socket.on("chatMessage", ({ code, text } = {}) => {

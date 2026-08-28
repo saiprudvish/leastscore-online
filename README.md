@@ -1,44 +1,27 @@
-# LeastScore — online multiplayer
+# LeastScore v16 — interaction-fixed mobile UI
 
-A mobile-first real-time card game based on your LeastScore rules and the reference screenshot/video.
+This build is based on the previous LeastScore v15 code and keeps the existing game/server logic while fixing the broken interaction flow.
 
-## Included
-- Username/password registration and login.
-- Private 5-character room codes.
-- 2–6 players.
-- Random first player each round.
-- Five cards dealt to every player.
-- Pick from closed deck or open card.
-- Six-card turn state, then discard one to finish.
-- Valid declaration checking:
-  - even-of-a-kind groups (2 or 4 of a rank)
-  - odd same-suit sequences (3 or 5)
-  - A2345 and 10JQKA are allowed; KA234 is rejected.
-- Five-second declaration review.
-- Winner scoring: each opponent adds `their round score - declarer's score`.
-- Losing declaration: declarer gets +25.
-- 100+ points eliminates a player.
-- Round continues until one player remains.
-- Players see scores and public pick/discard history, but never another player's five cards.
-- Mobile-first UI matching the supplied LeastScore reference screenshots.
-- Scrollable game screen with clean turn/timer treatment.
-- Multi-select hand cards visibly lift/highlight before choosing Deck or a discard card.
-- Up to three discard choices are shown as real cards; no large "cards left" panel.
-- Floating in-game chat bottom sheet.
-- Server-validated Autoplay button for the current player.
-- No red/green turn background takeover; state is communicated with compact indicators.
+## Fixed in v16
+- Hand cards use delegated click handling, so they remain clickable after every real-time state re-render.
+- Card selection can be changed freely; selecting a card clears the old pick-source choice so the move flow stays consistent.
+- Deck and discard cards are real touch buttons.
+- Make Move and Declare are wired to the server with connection handling.
+- Autoplay is now a toggle: when ON, the player's turn automatically triggers a server-validated autoplay move.
+- Autoplay always draws from the deck; timeout auto-play also draws from the deck.
+- Back / Exit now reliably leave the current room and return to the lobby, including a top-right Exit button.
+- Static assets are served with `no-store` and the app script is cache-busted as `app.js?v=16`, preventing old JavaScript from staying in the browser/Render cache.
+- Chat, table drawer, lobby controls, result controls and game actions remain connected.
+- Mobile touch handling was strengthened for cards and action buttons.
 
-## Run locally
-1. Install Node.js 18+.
+## Run
+1. Node.js 18+
 2. `npm install`
 3. `JWT_SECRET="use-a-long-random-secret" npm start`
-4. Open `http://localhost:3000`.
+4. Open `http://localhost:3000`
 
-For friends on the internet, deploy the folder to a Node-compatible host such as Render, Railway, Fly.io, or your own VPS. Use a persistent disk/DB for production user storage; this starter stores accounts in `users.json` and live games in memory.
+## Render
+Use the folder contents as the service root. Start command:
+`npm start`
 
-## Important production upgrades
-- Use PostgreSQL/Supabase for users, rooms and game state.
-- Use HTTPS/WSS.
-- Add rate limiting and password reset/email verification.
-- Persist active rooms if you need games to survive server restarts.
-- The remote Unsplash image is used only as the visual background; you can replace its URL in `styles.css`.
+No database is required for the current starter; accounts are stored in `users.json` and live rooms are kept in memory.
