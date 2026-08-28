@@ -65,53 +65,28 @@ function validLeaveGroup(cards) {
   if (!Array.isArray(cards) || cards.length === 0) return false;
   if (cards.length === 1) return true;
 
-  // Same-rank groups must contain an EVEN number of cards.
-  // With the current 3-suit deck this means exactly 2 cards.
-  // (The rule also supports 4 when a four-suit deck is used.)
+  // A pair is two cards of the same rank. With the three-suit deck, a
+  // four-of-a-kind cannot occur, but accepting 4 keeps the validator generic.
   if ((cards.length === 2 || cards.length === 4) &&
-      cards.every(c => c.rank === cards[0].rank)) {
-    return true;
-  }
+      cards.every(c => c.rank === cards[0].rank)) return true;
 
-  // Rank sequences are odd-length: 3, 5, 7...
-  // Suits do not have to match.
-  //
-  // Examples:
-  // 234, 456, 8910, 10JQ, QKA, A2345, 10JQKA
-  //
-  // KA234 is intentionally NOT valid.
-  if (cards.length >= 3 && cards.length % 2 === 1) {
+  // Any consecutive rank sequence of 3+ cards is valid, regardless of suit.
+  // This deliberately supports 234, 456, 8910, 10JQ, QKA and 10JQKA.
+  // KA234 is NOT a sequence and therefore remains invalid.
+  if (cards.length >= 3) {
     const vals = cards.map(c => rankValue(c.rank));
     if (new Set(vals).size !== vals.length) return false;
-
     vals.sort((a, b) => a - b);
 
-    // High-ace sequences:
-    // Q-K-A (3), 10-J-Q-K-A (5), etc.
+    // A can be low (A2345) or high (QKA / 10JQKA), but cannot wrap around
+    // through K back to 2 (KA234).
     if (vals.includes(1) && vals.includes(13)) {
-      const highAce = [12, 13, 1];
-      if (vals.length === 3 &&
-          vals[0] === 1 && vals[1] === 12 && vals[2] === 13) {
-        return true;
-      }
-
-      if (vals.length === 5 &&
-          vals.join(",") === "1,10,11,12,13") {
-        return true;
-      }
-
-      return false;
+      return (vals.length === 3 && vals.join(',') === '1,12,13') ||
+             (vals.length === 5 && vals.join(',') === '1,10,11,12,13');
     }
-
-    // Low ace: A-2-3... only.
-    if (vals[0] === 1) {
-      return vals.every((v, i) => v === i + 1);
-    }
-
-    // Normal consecutive ranks.
+    if (vals[0] === 1) return vals.every((v, i) => v === i + 1);
     return vals.every((v, i) => i === 0 || v === vals[i - 1] + 1);
   }
-
   return false;
 }
 function findLeaveGroups(hand) {
@@ -216,6 +191,7 @@ function drawCard(room, source, cardId = null) {
 function performMove(room, p, source, leaving, automatic = false, pickId = null) {
   if (room.status !== "playing" || room.players[room.turn] !== p || p.eliminated) return false;
   if (source !== "deck" && source !== "open") return false;
+  if (source === "open" && (!pickId || !room.open.some(c => c.id === pickId))) return false;
   if (!Array.isArray(leaving)) leaving = [];
   const unique = [...new Set(leaving.map(c => c.id))];
   const cards = unique.map(id => p.hand.find(c => c.id === id)).filter(Boolean);
@@ -518,7 +494,7 @@ io.on("connection", socket => {
     const ids = [...new Set(Array.isArray(leaveIds) ? leaveIds.map(String) : [])];
     const leaving = ids.map(id => p.hand.find(c => c.id === id)).filter(Boolean);
     if (leaving.length !== ids.length) return socket.emit("errorMsg", "One or more selected cards are not in your hand.");
-    if (!validLeaveGroup(leaving)) return socket.emit("errorMsg", "Invalid leave. Use 1 card, 2–4 same-rank cards, or an odd-length rank sequence such as 234, 456, 8910 or 10JQ. Suits may be mixed.");
+    if (!validLeaveGroup(leaving)) return socket.emit("errorMsg", "Invalid leave. Use 1 card, a same-rank pair, or a consecutive sequence such as 234, 456, 8910 or 10JQ.");
     if (source === "open" && !pickId) return socket.emit("errorMsg", "Choose a discard card to pick.");
     if (!performMove(room, p, source, leaving, false, String(pickId || ""))) return socket.emit("errorMsg", "Move could not be completed. Try again.");
   });
