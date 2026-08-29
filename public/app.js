@@ -94,7 +94,8 @@ function validLeavePreview(cards){
   return false
 }
 function cardLabel(c){return c?`${c.rank}${c.suit}`:"—"}
-function cardHTML(c){const selected=selectedIds.has(c.id)?" selected":"";return `<button type="button" class="card ${c.color||""}${selected}" data-id="${esc(c.id)}" data-role="hand-card"><span class="corner top">${esc(c.rank)}<i>${esc(c.suit)}</i></span><span class="pip">${esc(c.suit)}</span><span class="corner bottom">${esc(c.rank)}<i>${esc(c.suit)}</i></span></button>`}
+function cardPips(c){const n=rankValue(c.rank); if(n===1)return `<span class="pip ace">${esc(c.suit)}</span>`; if(n>10)return `<span class="face-rank">${esc(c.rank)}</span><span class="face-suit">${esc(c.suit)}</span>`; const count=Math.min(n,10); return `<span class="pip-grid p${count}">${Array.from({length:count},()=>`<i>${esc(c.suit)}</i>`).join("")}</span>`}
+function cardHTML(c){const selected=selectedIds.has(c.id)?" selected":"";return `<button type="button" class="card ${c.color||""}${selected}" data-id="${esc(c.id)}" data-role="hand-card" aria-label="${esc(c.rank+c.suit)}"><span class="corner top">${esc(c.rank)}<i>${esc(c.suit)}</i></span>${cardPips(c)}<span class="corner bottom">${esc(c.rank)}<i>${esc(c.suit)}</i></span></button>`}
 function secondsLeft(d){return d?Math.max(0,Math.ceil((d-Date.now())/1000)):0}
 
 function updateTimers(){if(!state)return;const mine=state.status==="playing"&&state.turn===state.me?.username;const e=$("turnTimer");if(state.status==="playing"&&state.turnDeadline){const left=secondsLeft(state.turnDeadline);e.textContent=`${left}s`;e.classList.toggle("urgent",left<=5)}else e.textContent="—";$("turnDot")?.classList.toggle("mine",mine);}
@@ -104,7 +105,7 @@ function updateSelectionUI(){
   const myTurn=state?.status==="playing"&&state.turn===state.me?.username;
   const cards=(state?.me?.hand||[]).filter(c=>selectedIds.has(c.id));
   const valid=validLeavePreview(cards);
-  $("handStatus").textContent=`${state?.me?.hand?.length||0} CARDS`;
+  $("handStatus").textContent=`${state?.me?.hand?.length||0} CARDS`;$("handSum").textContent=currentHandSum();
   $("selectionCount").textContent=cards.length?`${cards.length} selected${valid?"":" • invalid group"}`:"";
   const hint=$("selectionHint");
   if(!myTurn){hint.textContent=`${state?.turn||"Player"}'s turn`;return}
@@ -144,14 +145,16 @@ function renderChat(){const box=$("chatMessages");if(!box)return;box.innerHTML=(
 function renderChatBadge(){const b=$("chatBadge");if(unreadChat){b.textContent=unreadChat;b.classList.remove("hidden")}else b.classList.add("hidden")}
 function openChat(){$("chatPanel").classList.add("open");$("chatPanel").setAttribute("aria-hidden","false");unreadChat=0;renderChatBadge();renderChat()}
 function closeChat(){$("chatPanel").classList.remove("open");$("chatPanel").setAttribute("aria-hidden","true")}
-$("chatToggle").onclick=openChat;$("closeChat").onclick=closeChat;
+$("chatToggle").onclick=openChat;$("closeChat").onclick=closeChat;$("askBot")?.addEventListener("click",()=>{if(!state?.code)return;whenConnected(()=>socket.emit("chatMessage",{code:state.code,text:"/bot help"}));});
 function sendChat(){const input=$("chatInput"),text=input.value.trim();if(!text||!state?.code)return;whenConnected(()=>socket.emit("chatMessage",{code:state.code,text}));input.value=""}
 $("sendChat").onclick=sendChat;$("chatInput").onkeydown=e=>{if(e.key==="Enter")sendChat()};
 $("toggleTable").onclick=()=>$("tableDrawer").classList.add("open");$("closeTable").onclick=()=>$("tableDrawer").classList.remove("open");
 
 function renderResult(){show("result");const d=state.declaration||{};$("resultTitle").textContent=state.status==="gameOver"?"Game over":"Round complete";$("resultWinner").textContent=d.roundWinner?`${esc(d.roundWinner)} won this round`:"Round result";$("resultMessage").textContent=d.reason||(d.winner?`${d.username||d.declarer||"The declarer"} declared successfully.`:`${d.username||d.declarer||"The declarer"} declared and lost.`);$("resultDealTimer").textContent=d?`${secondsLeft(state.dealDeadline)}s`:"";const rows=(d.summary||[]).slice().sort((a,b)=>(a.outcome==="WIN"?-1:1)-(b.outcome==="WIN"?-1:1)||a.score-b.score);$("resultTableBody").innerHTML=rows.map(x=>`<div class="result-row"><b>${esc(x.username)}</b><span>${x.outcome}</span><span>${x.roundScore}</span><span>${x.score}</span></div>`).join("");$("resultDeal").classList.toggle("hidden",!state.canDeal||state.status!=="roundOver")}
 
-function render(){if(!state)return;if(state.status==="lobby"){show("lobby");lobbyRender();return}if(state.status==="roundOver"||state.status==="gameOver"){renderResult();return}show("game");const mine=state.status==="playing"&&state.turn===state.me?.username;$("turnBanner").textContent=mine?"YOUR TURN":`${state.turn||""}'S TURN`;$("turnPill")?.classList.toggle("mine",mine);$("turnDot")?.classList.toggle("mine",mine);$("round").textContent=`R${state.round}`;$("myScore").textContent=state.me?.score??0;$("targetScoreLabel").textContent=state.config?.targetScore??100;$("code").textContent=state.code||"";$("deckCount").textContent=state.deckCount??0;$("hand").innerHTML=(state.me?.hand||[]).map(cardHTML).join("");
+function currentHandSum(){return (state?.me?.hand||[]).reduce((n,c)=>n+rankValue(c.rank),0)}
+
+function render(){if(!state)return;if(state.status==="lobby"){show("lobby");lobbyRender();return}if(state.status==="roundOver"||state.status==="gameOver"){renderResult();return}show("game");const mine=state.status==="playing"&&state.turn===state.me?.username;$("turnBanner").textContent=mine?"YOUR TURN":`${state.turn||""}'S TURN`;$("turnPill")?.classList.toggle("mine",mine);$("turnDot")?.classList.toggle("mine",mine);$("round").textContent=`R${state.round}`;$("myScore").textContent=currentHandSum();$("handSum").textContent=currentHandSum();$("targetScoreLabel").textContent=state.config?.targetScore??100;$("code").textContent=state.code||"";$("deckCount").textContent=state.deckCount??0;$("hand").innerHTML=(state.me?.hand||[]).map(cardHTML).join("");
   renderDiscard(); bindGameControls(); renderPlayers();renderChat();updateSelectionUI();updateTimers();
   maybeAutoplay();
 }
