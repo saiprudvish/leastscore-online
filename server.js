@@ -47,31 +47,26 @@ app.use(express.static(path.join(__dirname, "public"), {
 }));
 
 function saveUsers() { fs.writeFileSync(DATA_FILE, JSON.stringify(users, null, 2)); }
-function tokenFor(username, email) { return jwt.sign({ username, email }, JWT_SECRET, { expiresIn: "30d" }); }
+function tokenFor(username, email = "") { return jwt.sign({ username, email }, JWT_SECRET, { expiresIn: "30d" }); }
 function auth(req, res, next) {
   try { req.user = jwt.verify((req.headers.authorization || "").replace("Bearer ", ""), JWT_SECRET); next(); }
   catch { res.status(401).json({ error: "Please login again." }); }
 }
 app.post("/api/register", async (req, res) => {
   const username = String(req.body.username || "").trim().toLowerCase();
-  const email = String(req.body.email || "").trim().toLowerCase();
   const password = String(req.body.password || "");
   if (!/^[a-z0-9_]{3,18}$/.test(username)) return res.status(400).json({ error: "Username: 3–18 letters, numbers or _." });
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "Enter a valid email address." });
   if (password.length < 5) return res.status(400).json({ error: "Password must be at least 5 characters." });
   if (users[username]) return res.status(409).json({ error: "Username already exists." });
-  if (Object.values(users).some(u => String(u.email || "").toLowerCase() === email)) return res.status(409).json({ error: "This email is already registered." });
-  users[username] = { email, password: await bcrypt.hash(password, 10), createdAt: Date.now() };
+  users[username] = { password: await bcrypt.hash(password, 10), createdAt: Date.now() };
   saveUsers();
-  res.json({ token: tokenFor(username, email), username, email });
+  res.json({ token: tokenFor(username), username });
 });
 app.post("/api/login", async (req, res) => {
-  const identity = String(req.body.identity || req.body.email || req.body.username || "").trim().toLowerCase();
+  const username = String(req.body.username || req.body.identity || "").trim().toLowerCase();
   const password = String(req.body.password || "");
-  const username = users[identity] ? identity : Object.keys(users).find(name => String(users[name].email || "").toLowerCase() === identity);
-  if (!username || !users[username] || !(await bcrypt.compare(password, users[username].password))) return res.status(401).json({ error: "Invalid email/username or password." });
-  const email = users[username].email || "";
-  res.json({ token: tokenFor(username, email), username, email });
+  if (!username || !users[username] || !(await bcrypt.compare(password, users[username].password))) return res.status(401).json({ error: "Invalid username or password." });
+  res.json({ token: tokenFor(username), username });
 });
 app.get("/api/me", auth, (req, res) => res.json({ username: req.user.username, email: users[req.user.username]?.email || req.user.email || "" }));
 app.post("/api/guest", (req, res) => {
