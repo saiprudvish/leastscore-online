@@ -9,9 +9,33 @@ const path = require("path");
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || "change-this-secret-in-production";
 const DATA_FILE = path.join(__dirname, "users.json");
+const ROOMS_FILE = path.join(__dirname, "rooms.json");
 
 let users = fs.existsSync(DATA_FILE) ? JSON.parse(fs.readFileSync(DATA_FILE, "utf8")) : {};
 const rooms = new Map();
+// Rooms are also written to disk so a normal Node/Render process restart does not
+// immediately make every active room disappear. (A platform with ephemeral storage
+// can still lose them on a full rebuild, so the client also handles stale rooms safely.)
+try {
+  if (fs.existsSync(ROOMS_FILE)) {
+    const savedRooms = JSON.parse(fs.readFileSync(ROOMS_FILE, "utf8"));
+    for (const raw of savedRooms) {
+      const room = { ...raw, turnTimer: null, timerToken: Number(raw.timerToken || 0), roundMovedBy: new Set(raw.roundMovedBy || []) };
+      (room.players || []).forEach(p => { p.socketId = null; p.connected = false; });
+      rooms.set(room.code, room);
+    }
+  }
+} catch (e) { console.warn("Could not restore rooms:", e.message); }
+
+function saveRooms() {
+  try {
+    const serializable = [...rooms.values()].map(r => ({
+      ...r, turnTimer: undefined, roundMovedBy: [...(r.roundMovedBy || [])],
+      players: (r.players || []).map(p => ({ ...p, socketId: null, connected: false }))
+    }));
+    fs.writeFileSync(ROOMS_FILE, JSON.stringify(serializable, null, 2));
+  } catch (e) { console.warn("Could not save rooms:", e.message); }
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -23,31 +47,36 @@ app.use(express.static(path.join(__dirname, "public"), {
 }));
 
 function saveUsers() { fs.writeFileSync(DATA_FILE, JSON.stringify(users, null, 2)); }
-function tokenFor(username) { return jwt.sign({ username }, JWT_SECRET, { expiresIn: "30d" }); }
+function tokenFor(username, email) { return jwt.sign({ username, email }, JWT_SECRET, { expiresIn: "30d" }); }
 function auth(req, res, next) {
   try { req.user = jwt.verify((req.headers.authorization || "").replace("Bearer ", ""), JWT_SECRET); next(); }
   catch { res.status(401).json({ error: "Please login again." }); }
 }
 app.post("/api/register", async (req, res) => {
   const username = String(req.body.username || "").trim().toLowerCase();
+  const email = String(req.body.email || "").trim().toLowerCase();
   const password = String(req.body.password || "");
   if (!/^[a-z0-9_]{3,18}$/.test(username)) return res.status(400).json({ error: "Username: 3–18 letters, numbers or _." });
-  if (password.length < 4) return res.status(400).json({ error: "Password must be at least 4 characters." });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "Enter a valid email address." });
+  if (password.length < 5) return res.status(400).json({ error: "Password must be at least 5 characters." });
   if (users[username]) return res.status(409).json({ error: "Username already exists." });
-  users[username] = { password: await bcrypt.hash(password, 10), createdAt: Date.now() };
+  if (Object.values(users).some(u => String(u.email || "").toLowerCase() === email)) return res.status(409).json({ error: "This email is already registered." });
+  users[username] = { email, password: await bcrypt.hash(password, 10), createdAt: Date.now() };
   saveUsers();
-  res.json({ token: tokenFor(username), username });
+  res.json({ token: tokenFor(username, email), username, email });
 });
 app.post("/api/login", async (req, res) => {
-  const username = String(req.body.username || "").trim().toLowerCase();
+  const identity = String(req.body.identity || req.body.email || req.body.username || "").trim().toLowerCase();
   const password = String(req.body.password || "");
-  if (!users[username] || !(await bcrypt.compare(password, users[username].password))) return res.status(401).json({ error: "Invalid username or password." });
-  res.json({ token: tokenFor(username), username });
+  const username = users[identity] ? identity : Object.keys(users).find(name => String(users[name].email || "").toLowerCase() === identity);
+  if (!username || !users[username] || !(await bcrypt.compare(password, users[username].password))) return res.status(401).json({ error: "Invalid email/username or password." });
+  const email = users[username].email || "";
+  res.json({ token: tokenFor(username, email), username, email });
 });
-app.get("/api/me", auth, (req, res) => res.json({ username: req.user.username }));
+app.get("/api/me", auth, (req, res) => res.json({ username: req.user.username, email: users[req.user.username]?.email || req.user.email || "" }));
 
 const RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
-const SUITS = ["♠", "♦", "♣"];
+const SUITS = ["♠", "♥", "♦", "♣"];
 const rankValue = r => r === "A" ? 1 : r === "J" ? 11 : r === "Q" ? 12 : r === "K" ? 13 : Number(r);
 function makeDeck() {
   const deck = [];
@@ -142,7 +171,7 @@ function nextActiveIndex(room, fromIndex) {
 }
 function nextTurn(room) { room.turn = nextActiveIndex(room, room.turn); }
 function addLog(room, msg) { room.log.push({ t: Date.now(), msg }); if (room.log.length > 40) room.log.shift(); }
-function emitRoom(room) { room.players.forEach(p => p.socketId && io.to(p.socketId).emit("state", roomView(room, p.username))); }
+function emitRoom(room) { saveRooms(); room.players.forEach(p => p.socketId && io.to(p.socketId).emit("state", roomView(room, p.username))); }
 
 function clearTurnTimer(room) {
   if (room.turnTimer) clearTimeout(room.turnTimer);
@@ -459,7 +488,7 @@ io.on("connection", socket => {
   socket.on("rejoinRoom", ({ code } = {}) => {
     code = String(code || "").trim().toUpperCase();
     const room = rooms.get(code);
-    if (!room) return socket.emit("errorMsg", "Your previous room is no longer available.");
+    if (!room) return socket.emit("roomUnavailable", { code });
     const p = findPlayer(room, username);
     if (!p || p.bot) return socket.emit("errorMsg", "You are not a player in that room.");
     p.connected = true;
@@ -491,7 +520,7 @@ io.on("connection", socket => {
   });
 
   socket.on("autoplay", ({ code } = {}) => {
-    const room = rooms.get(code);
+    const room = rooms.get(String(code || "").trim().toUpperCase());
     if (!room || room.status !== "playing") return socket.emit("errorMsg", "This round is not accepting moves.");
     const p = findPlayer(room, username);
     if (!p || p.eliminated || room.players[room.turn]?.username !== username) return socket.emit("errorMsg", "Autoplay is available only on your turn.");
@@ -513,7 +542,7 @@ io.on("connection", socket => {
   });
 
   socket.on("move", ({ code, source, leaveIds = [], pickId = null } = {}) => {
-    const room = rooms.get(code);
+    const room = rooms.get(String(code || "").trim().toUpperCase());
     if (!room || room.status !== "playing") return socket.emit("errorMsg", "This round is not accepting moves.");
     const p = findPlayer(room, username);
     if (!p || p.eliminated || room.players[room.turn]?.username !== username) return socket.emit("errorMsg", "Wait for your turn.");

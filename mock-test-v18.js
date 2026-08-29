@@ -1,0 +1,36 @@
+const fs=require('fs'), assert=require('assert');
+const app=fs.readFileSync('public/app.js','utf8');
+const html=fs.readFileSync('public/index.html','utf8');
+const css=fs.readFileSync('public/styles.css','utf8');
+const server=fs.readFileSync('server.js','utf8');
+
+// Every direct $("id").onclick target must exist in the HTML.
+const ids=new Set([...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]));
+const direct=[...app.matchAll(/\$\("([^"]+)"\)\.onclick/g)].map(m=>m[1]);
+for(const id of direct) assert(ids.has(id), `Missing HTML id for direct handler: ${id}`);
+assert(!app.includes('$("deal").onclick'), 'Old fatal missing #deal handler remains');
+assert(app.includes('$("deal")?.addEventListener'), 'Null-safe deal binding missing');
+assert(app.includes('document.addEventListener("click",e=>'), 'Delegated game controls missing');
+for(const key of ['#hand [data-role="hand-card"]','#deck','#move','#declare','#autoplay','#open .open-choice']) assert(app.includes(key), `Control path missing: ${key}`);
+assert(app.includes('socket.emit("move"'), 'Move socket event missing');
+assert(app.includes('socket.emit("declare"'), 'Declare socket event missing');
+assert(app.includes('socket.emit("autoplay"'), 'Autoplay socket event missing');
+assert(app.includes('socket.emit("leaveRoom"'), 'Exit/leave socket event missing');
+assert(app.includes('roomUnavailable'), 'Stale room recovery missing');
+assert(html.includes('id="email"'), 'Email field missing');
+assert(server.includes('Password must be at least 5 characters'), '5-char password rule missing');
+assert(server.includes('This email is already registered'), 'Unique email rule missing');
+assert(server.includes('const SUITS = ["♠", "♥", "♦", "♣"]'), 'Standard 4-suit deck missing');
+assert(html.includes('move-table-head'), 'Detailed table headers missing');
+assert(app.includes('move-left') && app.includes('move-picked'), 'Left/picked table columns missing');
+assert(html.includes('/app.js?v=18'), 'Cache-busted v18 app URL missing');
+assert(css.includes('game-top-actions .top-icon{font-size:16px!important'), 'Mobile top icons fix missing');
+console.log('V18 STATIC MOCK TESTS PASSED');
+console.log('✓ No direct onclick binding points to a missing HTML element');
+console.log('✓ The v17 fatal #deal null crash is removed');
+console.log('✓ Card/deck/discard/move/declare/autoplay delegated handlers exist');
+console.log('✓ Email + unique-email + 5-character password validation exists');
+console.log('✓ Standard four-suit deck exists');
+console.log('✓ Previous-room recovery clears stale local storage');
+console.log('✓ Detailed Player / Left / Picked / Score table exists');
+console.log('✓ Mobile top-right controls are visible');

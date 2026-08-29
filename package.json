@@ -1,13 +1,15 @@
 {
-  "name":"leastscore-online",
-  "version":"8.0.0",
-  "private":true,
-  "main":"server.js",
-  "scripts":{"start":"node server.js"},
-  "dependencies":{
-    "bcryptjs":"^2.4.3",
-    "express":"^4.21.2",
-    "jsonwebtoken":"^9.0.2",
-    "socket.io":"^4.8.1"
+  "name": "leastscore-online",
+  "version": "18.0.0",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "socket.io": "^4.8.1"
   }
 }
