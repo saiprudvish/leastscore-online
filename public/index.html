@@ -36,7 +36,9 @@
     <p class="tag">THE CARD GAME WHERE LESS WINS</p>
     <div class="auth-tabs"><button class="tab active" data-mode="login">Login</button><button class="tab" data-mode="register">Sign up</button></div>
     <input id="username" placeholder="Username" autocomplete="username">
-    <input id="password" type="password" placeholder="Password" autocomplete="current-password">
+    <input id="email" type="email" placeholder="Email address" autocomplete="email">
+    <input id="password" type="password" placeholder="Password (minimum 5 characters)" autocomplete="current-password">
+    <button id="googleLogin" class="secondary wide google-login" type="button">G Continue with Google</button>
     <button id="authBtn" class="primary wide">Enter the table</button>
     <p id="authMsg" class="muted auth-msg"></p>
   </div>
@@ -65,7 +67,7 @@
   <header class="game-topbar">
     <button id="exitGame" class="back-btn">← <span>Back</span></button>
     <div class="turn-pill"><span id="turnDot" class="turn-dot"></span><strong id="turnBanner">YOUR TURN</strong><span class="timer-pill">⏱ <b id="turnTimer">—</b></span></div>
-    <div class="game-top-actions"><button id="copyGameCode" class="top-icon" title="Copy room code">#<span id="code"></span></button><button id="settingsGame" class="top-icon" title="Settings">⚙</button><button id="exitGameTop" class="top-icon exit-icon" title="Exit game" aria-label="Exit game">↪</button></div>
+    <div class="game-top-actions"><button id="copyGameCode" class="top-icon code-icon" title="Copy room code">#<span id="code"></span></button><button id="settingsGame" class="top-icon" title="Settings" aria-label="Settings">⚙</button><button id="exitGameTop" class="top-icon exit-icon" title="Exit game" aria-label="Exit game">↪</button></div>
   </header>
 
   <main class="game-main">
@@ -101,6 +103,7 @@
 
     <section class="mobile-table-status">
       <div class="status-heading"><span>TABLE</span><button id="toggleTable" class="tiny-link">Players & moves</button></div>
+      <div class="move-table-head"><span>PLAYER</span><span>LEFT</span><span>PICKED</span><span>SCORE</span></div>
       <div id="mobileTableRows"></div>
     </section>
   </main>
@@ -115,7 +118,7 @@
 
   <aside id="tableDrawer" class="table-drawer" aria-hidden="true">
     <div class="drawer-head"><strong>Table & moves</strong><button id="closeTable" class="icon-btn">×</button></div>
-    <div id="drawerPlayers"></div>
+    <div class="drawer-table-head"><span>PLAYER</span><span>LEFT</span><span>PICKED</span><span>SCORE</span></div><div id="drawerPlayers"></div>
   </aside>
 </section>
 
@@ -126,6 +129,6 @@
 </section>
 
 <script src="/socket.io/socket.io.js"></script>
-<script src="/app.js?v=17"></script>
+<script src="/app.js?v=18"></script>
 </body>
 </html>

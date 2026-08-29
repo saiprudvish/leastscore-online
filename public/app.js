@@ -21,6 +21,7 @@ function connect(){
   if(socket?.connected||socket?.active)return socket;
   socket=io({auth:{token}});
   socket.on("connect",()=>{const saved=localStorage.getItem("ls_room");if(saved)socket.emit("rejoinRoom",{code:saved})});
+  socket.on("roomUnavailable",()=>{localStorage.removeItem("ls_room");state=null;resetSelection();show("lobby");renderLobbyDefaults();toast("That previous room is no longer available. Please create or join a room.")});
   socket.on("connect_error",e=>toast(e?.message||"Unable to connect."));
   socket.on("errorMsg",m=>toast(m||"Something went wrong."));
   socket.on("kicked",()=>{localStorage.removeItem("ls_room");state=null;resetSelection();show("lobby");toast("You were removed from the table.")});
@@ -39,9 +40,13 @@ function connect(){
   return socket;
 }
 
-async function enter(){try{const j=await api("/api/"+mode,{username:$("username").value,password:$("password").value});token=j.token;localStorage.setItem("ls_token",token);$("welcome").textContent="";show("lobby");connect();}catch(e){$("authMsg").textContent=e.message}}
-document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");mode=b.dataset.mode;$("authBtn").textContent=mode==="login"?"Enter the table":"Create my account";$("authMsg").textContent=""});
+async function enter(){try{
+  const body={username:$("username").value.trim(),email:$("email")?.value.trim(),identity:$("email")?.value.trim()||$("username").value.trim(),password:$("password").value};
+  const j=await api("/api/"+mode,body);token=j.token;localStorage.setItem("ls_token",token);$("welcome").textContent="";show("lobby");connect();
+}catch(e){$("authMsg").textContent=e.message}}
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");mode=b.dataset.mode;$("authBtn").textContent=mode==="login"?"Enter the table":"Create my account";const email=$("email");if(email){email.placeholder=mode==="login"?"Email or username":"Email address";email.required=mode==="register"}$("authMsg").textContent=""});
 $("authBtn").onclick=enter;$("password").onkeydown=e=>{if(e.key==="Enter")enter()};
+$("googleLogin")?.addEventListener("click",()=>toast("Google sign-in needs a Google OAuth Client ID. Email/password sign-in is ready now; add GOOGLE_CLIENT_ID during deployment to enable Google."));
 $("logout").onclick=()=>{localStorage.removeItem("ls_token");localStorage.removeItem("ls_room");socket?.disconnect();location.reload()};
 
 function renderLobbyDefaults(){$("lobbyRoom")?.classList.add("hidden");$("create")?.classList.remove("hidden");$("roomCode")&&($("roomCode").value="")}
@@ -59,7 +64,7 @@ $("copyLobbyCode").onclick=copyRoomCode;$("copyGameCode").onclick=copyRoomCode;
 function shareInvite(){if(!state?.code)return;const url=`${location.origin}${location.pathname}?join=${encodeURIComponent(state.code)}`,text=`Join my LeastScore game! ${url}`;if(navigator.share)navigator.share({title:"LeastScore game invite",text,url}).catch(()=>{});else copyText(text,"Invite copied")}
 $("shareLobby").onclick=shareInvite;
 $("startGame").onclick=()=>{if(state?.code)whenConnected(()=>socket.emit("startGame",{code:state.code}))};
-$("deal").onclick=()=>{if(state?.code)socket.emit("deal",{code:state.code})};$("resultDeal").onclick=()=>{if(state?.code)socket.emit("deal",{code:state.code})};
+$("deal")?.addEventListener("click",()=>{if(state?.code)socket.emit("deal",{code:state.code})});$("resultDeal")?.addEventListener("click",()=>{if(state?.code)socket.emit("deal",{code:state.code})});
 function leaveCurrentRoom(){
   const code=state?.code||localStorage.getItem("ls_room");
   if(!code){localStorage.removeItem("ls_room");resetSelection();show("lobby");return;}
@@ -113,9 +118,9 @@ function renderDiscard(){
 
 function renderPlayers(){
   const players=state?.players||[];
-  const html=players.map(p=>`<div class="drawer-player ${p.username===state.turn?"active":""}"><div class="avatar">${esc(p.username[0]?.toUpperCase()||"?")}</div><div><b>${esc(p.username)}${p.username===state.me?.username?" (you)":""}${p.bot?" 🤖":""}</b><small>${p.username===state.turn?"Current turn":"Last: "+(p.lastAction?latestMoveLabel(p):"Waiting")}</small></div><div class="drawer-score">${p.score}</div></div>`).join("");
-  $("drawerPlayers").innerHTML=html;$("scorePlayers").textContent=players.length;
-  $("mobileTableRows").innerHTML=players.map(p=>`<div class="move-row"><div class="move-avatar">${esc(p.username[0]?.toUpperCase()||"?")}</div><div class="move-main"><b>${esc(p.username)}${p.username===state.turn?" • TURN":""}</b><small>${esc(p.lastAction?latestMoveLabel(p):"Waiting for move")}</small></div><div class="move-score">${p.score}</div></div>`).join("");
+  const row=p=>{const m=p.lastAction;const left=(m?.leftCards||[]).map(cardLabel).join(" ")||"—";const picked=!m?"—":(m.from==="deck"||m.picked==="deck"?"Deck":cardLabel(m.picked));return `<div class="move-row ${p.username===state.turn?"active":""}"><div class="move-avatar">${esc(p.username[0]?.toUpperCase()||"?")}</div><div class="move-player"><b>${esc(p.username)}${p.username===state.turn?" • TURN":""}${p.bot?" 🤖":""}</b><small>${m?.automatic?"Auto move":m?"Last move":"Waiting for move"}</small></div><div class="move-left">${esc(left)}</div><div class="move-picked">${esc(picked)}</div><div class="move-score">${p.score}</div></div>`};
+  const html=players.map(row).join("");
+  $("drawerPlayers").innerHTML=html;$("scorePlayers").textContent=players.length;$("mobileTableRows").innerHTML=html;
 }
 function latestMoveLabel(p){const m=p?.lastAction;if(!m)return"Waiting";const left=(m.leftCards||[]).map(cardLabel).join(" ")||"—";const picked=m.from==="deck"||m.picked==="deck"?"Deck":cardLabel(m.picked);return `${m.automatic?"Auto • ":""}Left ${left} • Picked ${picked}`}
 
@@ -188,26 +193,18 @@ function maybeAutoplay(){
 
 // Bind controls after every state render. This avoids stale DOM handlers when the hand is rebuilt.
 function bindGameControls(){
-  document.querySelectorAll('#hand [data-role="hand-card"]').forEach(card=>{
-    card.onclick=e=>{
-      e.preventDefault(); e.stopPropagation();
-      if(state?.status!=="playing"||state.turn!==state.me?.username)return toast("Wait for your turn.");
-      const id=card.dataset.id;
-      if(selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
-      // Selecting/deselecting a leave card always clears the previous pick.
-      selectedSource=null; selectedPickId=null;
-      render();
-    };
-  });
-  document.querySelectorAll('#open .open-choice').forEach(open=>{
-    open.onclick=e=>{e.preventDefault();e.stopPropagation();chooseDiscard(open.dataset.pickId)};
-  });
-  const deck=$("deck"); if(deck) deck.onclick=e=>{e.preventDefault();chooseDeck()};
-  const move=$("move"); if(move) move.onclick=e=>{e.preventDefault();submitMove()};
-  const declare=$("declare"); if(declare) declare.onclick=e=>{e.preventDefault();submitDeclare()};
-  const autoplay=$("autoplay"); if(autoplay) autoplay.onclick=e=>{e.preventDefault();toggleAutoplay()};
+  // Delegated pointer/click handlers are installed once on the current DOM so cards remain interactive after every render.
+  if(window.__leastscoreControlsBound)return; window.__leastscoreControlsBound=true;
+  document.addEventListener("click",e=>{
+    const hand=e.target.closest('#hand [data-role="hand-card"]');
+    if(hand){e.preventDefault();if(state?.status!=="playing"||state.turn!==state.me?.username)return toast("Wait for your turn.");const id=hand.dataset.id;if(selectedIds.has(id))selectedIds.delete(id);else selectedIds.add(id);selectedSource=null;selectedPickId=null;render();return}
+    const open=e.target.closest('#open .open-choice');if(open){e.preventDefault();chooseDiscard(open.dataset.pickId);return}
+    if(e.target.closest('#deck')){e.preventDefault();chooseDeck();return}
+    if(e.target.closest('#move')){e.preventDefault();submitMove();return}
+    if(e.target.closest('#declare')){e.preventDefault();submitDeclare();return}
+    if(e.target.closest('#autoplay')){e.preventDefault();toggleAutoplay();return}
+  },true);
 }
-
 document.addEventListener("touchstart", ensureAudio, {passive:true, once:true});
 
 const inviteRoom=new URLSearchParams(location.search).get("join");if(inviteRoom&&$("roomCode"))$("roomCode").value=inviteRoom.toUpperCase();
