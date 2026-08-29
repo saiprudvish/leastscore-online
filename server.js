@@ -74,6 +74,11 @@ app.post("/api/login", async (req, res) => {
   res.json({ token: tokenFor(username, email), username, email });
 });
 app.get("/api/me", auth, (req, res) => res.json({ username: req.user.username, email: users[req.user.username]?.email || req.user.email || "" }));
+app.post("/api/guest", (req, res) => {
+  const base = String(req.body.username || "Guest").trim().replace(/[^a-zA-Z0-9_]/g, "").slice(0, 14) || "Guest";
+  const username = `${base}_${Math.random().toString(36).slice(2,7)}`;
+  res.json({ token: tokenFor(username, ""), username, guest: true });
+});
 
 const RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
 const SUITS = ["♠", "♥", "♦", "♣"];

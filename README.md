@@ -25,3 +25,6 @@ Use the folder contents as the service root. Start command:
 `npm start`
 
 No database is required for the current starter; accounts are stored in `users.json` and live rooms are kept in memory.
+
+
+V19 changes: Guest play, Google sign-in removed, robust card touch/click controls, immediate Back/Exit, redesigned full-size card faces, cache version v19.
