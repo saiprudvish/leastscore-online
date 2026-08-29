@@ -540,10 +540,16 @@ io.on("connection", socket => {
     const p = room && findPlayer(room, username);
     const clean = String(text || "").trim().slice(0, 180);
     if (!room || !p || p.eliminated || !clean) return;
-    const message = { id: `${Date.now()}-${Math.random().toString(36).slice(2,7)}`, username, text: clean, at: Date.now() };
-    room.chat.push(message);
-    if (room.chat.length > 100) room.chat.shift();
-    room.players.forEach(x => x.socketId && io.to(x.socketId).emit("chatMessage", message));
+    const broadcast = message => { room.chat.push(message); if (room.chat.length > 100) room.chat.shift(); room.players.forEach(x => x.socketId && io.to(x.socketId).emit("chatMessage", message)); };
+    if (/^\/bot\b/i.test(clean) || /^(bot|help)\b/i.test(clean)) {
+      const mine = findPlayer(room, username);
+      const hand = mine?.hand || [];
+      const score = handScore(hand);
+      const reply = room.status !== "playing" ? "Game Bot: The round is not active yet. Start a room or wait for the next round." : `Game Bot: Your current hand total is ${score}. Select cards to leave, then choose Deck or a discard card. You can declare only after completing your first move and on your own turn.`;
+      broadcast({ id: `${Date.now()}-bot`, username: "Game Bot 🤖", text: reply, at: Date.now(), bot: true });
+      return;
+    }
+    broadcast({ id: `${Date.now()}-${Math.random().toString(36).slice(2,7)}`, username, text: clean, at: Date.now() });
   });
 
   socket.on("move", ({ code, source, leaveIds = [], pickId = null } = {}) => {
