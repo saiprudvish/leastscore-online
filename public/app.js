@@ -80,7 +80,7 @@ function validLeavePreview(cards){
   return false
 }
 function cardLabel(c){return c?`${c.rank}${c.suit}`:"—"}
-function cardHTML(c){const selected=selectedIds.has(c.id)?" selected":"";return `<button type="button" class="card ${c.color||""}${selected}" data-id="${esc(c.id)}"><div class="corner">${esc(c.rank)}<span class="suit">${esc(c.suit)}</span></div><div class="big">${esc(c.suit)}</div></button>`}
+function cardHTML(c){const selected=selectedIds.has(c.id)?" selected":"";return `<button type="button" class="card ${c.color||""}${selected}" data-id="${esc(c.id)}" data-role="hand-card"><div class="corner">${esc(c.rank)}<span class="suit">${esc(c.suit)}</span></div><div class="big">${esc(c.suit)}</div></button>`}
 function secondsLeft(d){return d?Math.max(0,Math.ceil((d-Date.now())/1000)):0}
 
 function updateTimers(){if(!state)return;const mine=state.status==="playing"&&state.turn===state.me?.username;const e=$("turnTimer");if(state.status==="playing"&&state.turnDeadline){const left=secondsLeft(state.turnDeadline);e.textContent=`${left}s`;e.classList.toggle("urgent",left<=5)}else e.textContent="—";$("turnDot")?.classList.toggle("mine",mine);}
@@ -139,7 +139,7 @@ $("toggleTable").onclick=()=>$("tableDrawer").classList.add("open");$("closeTabl
 function renderResult(){show("result");const d=state.declaration||{};$("resultTitle").textContent=state.status==="gameOver"?"Game over":"Round complete";$("resultWinner").textContent=d.roundWinner?`${esc(d.roundWinner)} won this round`:"Round result";$("resultMessage").textContent=d.reason||(d.winner?`${d.username||d.declarer||"The declarer"} declared successfully.`:`${d.username||d.declarer||"The declarer"} declared and lost.`);$("resultDealTimer").textContent=d?`${secondsLeft(state.dealDeadline)}s`:"";const rows=(d.summary||[]).slice().sort((a,b)=>(a.outcome==="WIN"?-1:1)-(b.outcome==="WIN"?-1:1)||a.score-b.score);$("resultTableBody").innerHTML=rows.map(x=>`<div class="result-row"><b>${esc(x.username)}</b><span>${x.outcome}</span><span>${x.roundScore}</span><span>${x.score}</span></div>`).join("");$("resultDeal").classList.toggle("hidden",!state.canDeal||state.status!=="roundOver")}
 
 function render(){if(!state)return;if(state.status==="lobby"){show("lobby");lobbyRender();return}if(state.status==="roundOver"||state.status==="gameOver"){renderResult();return}show("game");const mine=state.status==="playing"&&state.turn===state.me?.username;$("turnBanner").textContent=mine?"YOUR TURN":`${state.turn||""}'S TURN`;$("turnPill")?.classList.toggle("mine",mine);$("turnDot")?.classList.toggle("mine",mine);$("round").textContent=`R${state.round}`;$("myScore").textContent=state.me?.score??0;$("targetScoreLabel").textContent=state.config?.targetScore??100;$("code").textContent=state.code||"";$("deckCount").textContent=state.deckCount??0;$("hand").innerHTML=(state.me?.hand||[]).map(cardHTML).join("");
-  renderDiscard();renderPlayers();renderChat();updateSelectionUI();updateTimers();
+  renderDiscard(); bindGameControls(); renderPlayers();renderChat();updateSelectionUI();updateTimers();
   maybeAutoplay();
 }
 
@@ -186,24 +186,29 @@ function maybeAutoplay(){
   },450);
 }
 
-// One delegated handler keeps cards/buttons working even after every state re-render.
-document.addEventListener("click",e=>{
-  const card=e.target.closest?.("#hand .card");
-  if(card){
-    e.preventDefault();
-    if(state?.status!=="playing"||state.turn!==state.me?.username)return toast("Wait for your turn.");
-    const id=card.dataset.id;
-    if(selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
-    // Changing the hand selection invalidates the source until the player confirms it again.
-    selectedSource=null; selectedPickId=null; render(); return;
-  }
-  const open=e.target.closest?.("#open .open-choice");
-  if(open){e.preventDefault();chooseDiscard(open.dataset.pickId);return;}
-});
-$("deck").onclick=chooseDeck;
-$("move").onclick=submitMove;
-$("declare").onclick=submitDeclare;
-$("autoplay").onclick=toggleAutoplay;
+// Bind controls after every state render. This avoids stale DOM handlers when the hand is rebuilt.
+function bindGameControls(){
+  document.querySelectorAll('#hand [data-role="hand-card"]').forEach(card=>{
+    card.onclick=e=>{
+      e.preventDefault(); e.stopPropagation();
+      if(state?.status!=="playing"||state.turn!==state.me?.username)return toast("Wait for your turn.");
+      const id=card.dataset.id;
+      if(selectedIds.has(id)) selectedIds.delete(id); else selectedIds.add(id);
+      // Selecting/deselecting a leave card always clears the previous pick.
+      selectedSource=null; selectedPickId=null;
+      render();
+    };
+  });
+  document.querySelectorAll('#open .open-choice').forEach(open=>{
+    open.onclick=e=>{e.preventDefault();e.stopPropagation();chooseDiscard(open.dataset.pickId)};
+  });
+  const deck=$("deck"); if(deck) deck.onclick=e=>{e.preventDefault();chooseDeck()};
+  const move=$("move"); if(move) move.onclick=e=>{e.preventDefault();submitMove()};
+  const declare=$("declare"); if(declare) declare.onclick=e=>{e.preventDefault();submitDeclare()};
+  const autoplay=$("autoplay"); if(autoplay) autoplay.onclick=e=>{e.preventDefault();toggleAutoplay()};
+}
+
+document.addEventListener("touchstart", ensureAudio, {passive:true, once:true});
 
 const inviteRoom=new URLSearchParams(location.search).get("join");if(inviteRoom&&$("roomCode"))$("roomCode").value=inviteRoom.toUpperCase();
 if(token){show("lobby");fetch("/api/me",{headers:{Authorization:"Bearer "+token}}).then(r=>{if(!r.ok)throw Error();return r.json()}).then(j=>{$("welcome").textContent=j.username;$("welcomeAvatar").textContent=j.username[0]?.toUpperCase()||"C";connect();if(inviteRoom)setTimeout(()=>{whenConnected(()=>socket.emit("joinRoom",{code:inviteRoom.toUpperCase()}))},500)}).catch(()=>{localStorage.removeItem("ls_token");token=null;show("auth")})}
