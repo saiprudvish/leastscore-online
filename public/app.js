@@ -41,10 +41,10 @@ function connect(){
 }
 
 async function enter(){try{
-  const body={username:$("username").value.trim(),email:$("email")?.value.trim(),identity:$("email")?.value.trim()||$("username").value.trim(),password:$("password").value};
+  const body={username:$("username").value.trim(),identity:$("username").value.trim(),password:$("password").value};
   const j=await api("/api/"+mode,body);token=j.token;localStorage.setItem("ls_token",token);$("welcome").textContent="";show("lobby");connect();
 }catch(e){$("authMsg").textContent=e.message}}
-document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");mode=b.dataset.mode;$("authBtn").textContent=mode==="login"?"Enter the table":"Create my account";const email=$("email");if(email){email.placeholder=mode==="login"?"Email or username":"Email address";email.required=mode==="register"}$("authMsg").textContent=""});
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");mode=b.dataset.mode;$("authBtn").textContent=mode==="login"?"Enter the table":"Create my account";$("authMsg").textContent=""});
 $("authBtn").onclick=enter;$("password").onkeydown=e=>{if(e.key==="Enter")enter()};
 $("guestBtn")?.addEventListener("click", async()=>{
   try {
@@ -94,11 +94,11 @@ function validLeavePreview(cards){
   return false
 }
 function cardLabel(c){return c?`${c.rank}${c.suit}`:"—"}
-function cardPips(c){const n=rankValue(c.rank); if(n===1)return `<span class="pip ace">${esc(c.suit)}</span>`; if(n>10)return `<span class="face-rank">${esc(c.rank)}</span><span class="face-suit">${esc(c.suit)}</span>`; const count=Math.min(n,10); return `<span class="pip-grid p${count}">${Array.from({length:count},()=>`<i>${esc(c.suit)}</i>`).join("")}</span>`}
+function cardPips(c){const n=rankValue(c.rank); if(n>10)return `<span class="face-rank">${esc(c.rank)}</span><span class="face-suit">${esc(c.suit)}</span>`; return `<span class="pip ace">${esc(c.suit)}</span>`}
 function cardHTML(c){const selected=selectedIds.has(c.id)?" selected":"";return `<button type="button" class="card ${c.color||""}${selected}" data-id="${esc(c.id)}" data-role="hand-card" aria-label="${esc(c.rank+c.suit)}"><span class="corner top">${esc(c.rank)}<i>${esc(c.suit)}</i></span>${cardPips(c)}<span class="corner bottom">${esc(c.rank)}<i>${esc(c.suit)}</i></span></button>`}
 function secondsLeft(d){return d?Math.max(0,Math.ceil((d-Date.now())/1000)):0}
 
-function updateTimers(){if(!state)return;const mine=state.status==="playing"&&state.turn===state.me?.username;const e=$("turnTimer");if(state.status==="playing"&&state.turnDeadline){const left=secondsLeft(state.turnDeadline);e.textContent=`${left}s`;e.classList.toggle("urgent",left<=5)}else e.textContent="—";$("turnDot")?.classList.toggle("mine",mine);}
+function updateTimers(){if(!state)return;const mine=state.status==="playing"&&state.turn===state.me?.username;const e=$("turnTimer");if(state.status==="playing"&&state.turnDeadline){const left=secondsLeft(state.turnDeadline);e.textContent=`${left}s`;e.classList.toggle("urgent",left<=5)}else e.textContent="—";const r=$("resultDealTimer");if(r&&state.status==="roundOver"&&state.dealDeadline)r.textContent=`${secondsLeft(state.dealDeadline)}s`;$("turnDot")?.classList.toggle("mine",mine);}
 setInterval(updateTimers,200);
 
 function updateSelectionUI(){
@@ -122,12 +122,12 @@ function updateSelectionUI(){
 
 function renderDiscard(){
   const open=$("open");const cards=state?.openCards||[];
-  open.innerHTML=cards.length?cards.slice(-3).map((c,i)=>`<button type="button" class="open-choice ${c.color||""}" data-pick-id="${esc(c.id)}" style="z-index:${i+1}"><span class="rank">${esc(c.rank)}</span><span class="suit">${esc(c.suit)}</span></button>`).join(""):"<div class='open-empty'>No discard</div>";
+  open.innerHTML=cards.length?cards.map((c,i)=>`<button type="button" class="open-choice ${c.color||""}" data-pick-id="${esc(c.id)}" style="z-index:${i+1};left:${i*48}px"><span class="rank">${esc(c.rank)}</span><span class="suit">${esc(c.suit)}</span></button>`).join(""):"<div class='open-empty'>No discard</div>";
 }
 
 function renderPlayers(){
   const players=state?.players||[];
-  const row=p=>{const m=p.lastAction;const left=(m?.leftCards||[]).map(cardLabel).join(" ")||"—";const picked=!m?"—":(m.from==="deck"||m.picked==="deck"?"Deck":cardLabel(m.picked));return `<div class="move-row ${p.username===state.turn?"active":""}"><div class="move-avatar">${esc(p.username[0]?.toUpperCase()||"?")}</div><div class="move-player"><b>${esc(p.username)}${p.username===state.turn?" • TURN":""}${p.bot?" 🤖":""}</b><small>${m?.automatic?"Auto move":m?"Last move":"Waiting for move"}</small></div><div class="move-left">${esc(left)}</div><div class="move-picked">${esc(picked)}</div><div class="move-score">${p.score}</div></div>`};
+  const row=p=>{const m=p.lastAction;const left=((m?.leftCards||[]).map(cardLabel).join(" ")||"—")+(m?.automatic?" (Auto)":"");const picked=!m?"—":(m.from==="deck"||m.picked==="deck"?"Deck":cardLabel(m.picked));return `<div class="move-row ${p.username===state.turn?"active":""}"><div class="move-avatar">${esc(p.username[0]?.toUpperCase()||"?")}</div><div class="move-player"><b>${esc(p.username)}${p.username===state.turn?" • TURN":""}${p.bot?" 🤖":""}</b><small>${m?.automatic?"Auto move":m?"Last move":"Waiting for move"}</small></div><div class="move-left">${esc(left)}</div><div class="move-picked">${esc(picked)}</div><div class="move-score">${p.score}</div></div>`};
   const html=players.map(row).join("");
   $("drawerPlayers").innerHTML=html;$("scorePlayers").textContent=players.length;$("mobileTableRows").innerHTML=html;
 }
@@ -150,7 +150,7 @@ function sendChat(){const input=$("chatInput"),text=input.value.trim();if(!text|
 $("sendChat").onclick=sendChat;$("chatInput").onkeydown=e=>{if(e.key==="Enter")sendChat()};
 $("toggleTable").onclick=()=>$("tableDrawer").classList.add("open");$("closeTable").onclick=()=>$("tableDrawer").classList.remove("open");
 
-function renderResult(){show("result");const d=state.declaration||{};$("resultTitle").textContent=state.status==="gameOver"?"Game over":"Round complete";$("resultWinner").textContent=d.roundWinner?`${esc(d.roundWinner)} won this round`:"Round result";$("resultMessage").textContent=d.reason||(d.winner?`${d.username||d.declarer||"The declarer"} declared successfully.`:`${d.username||d.declarer||"The declarer"} declared and lost.`);$("resultDealTimer").textContent=d?`${secondsLeft(state.dealDeadline)}s`:"";const rows=(d.summary||[]).slice().sort((a,b)=>(a.outcome==="WIN"?-1:1)-(b.outcome==="WIN"?-1:1)||a.score-b.score);$("resultTableBody").innerHTML=rows.map(x=>`<div class="result-row"><b>${esc(x.username)}</b><span>${x.outcome}</span><span>${x.roundScore}</span><span>${x.score}</span></div>`).join("");$("resultDeal").classList.toggle("hidden",!state.canDeal||state.status!=="roundOver")}
+function renderResult(){show("result");const d=state.declaration||{};$("resultTitle").textContent=state.status==="gameOver"?"Game over":"Round complete";$("resultWinner").textContent=d.roundWinner?`${esc(d.roundWinner)} won this round`:"Round result";$("resultMessage").textContent=d.reason||(d.winner?`${d.username||d.declarer||"The declarer"} declared successfully.`:`${d.username||d.declarer||"The declarer"} declared and lost.`);$("resultDealTimer").textContent=d?`${secondsLeft(state.dealDeadline)}s`:"";const rows=(d.summary||[]).slice().sort((a,b)=>(a.outcome==="WIN"?-1:1)-(b.outcome==="WIN"?-1:1)||a.score-b.score);$("resultTableBody").innerHTML=rows.map(x=>`<div class="result-row"><b>${esc(x.username)}</b><span>${x.outcome}</span><span>${x.roundScore}</span></div>`).join("");$("resultDeal").classList.toggle("hidden",!state.canDeal||state.status!=="roundOver")}
 
 function currentHandSum(){return (state?.me?.hand||[]).reduce((n,c)=>n+rankValue(c.rank),0)}
 
@@ -162,14 +162,10 @@ function render(){if(!state)return;if(state.status==="lobby"){show("lobby");lobb
 function currentHandSelection(){return (state?.me?.hand||[]).filter(c=>selectedIds.has(c.id));}
 function chooseDeck(){
   if(state?.status!=="playing"||state.turn!==state.me?.username)return toast("Wait for your turn.");
-  const cards=currentHandSelection();
-  if(!validLeavePreview(cards))return toast("Select a valid group to leave first.");
   selectedSource=selectedSource==="deck"?null:"deck"; selectedPickId=null; updateSelectionUI();
 }
 function chooseDiscard(id){
   if(state?.status!=="playing"||state.turn!==state.me?.username)return toast("Wait for your turn.");
-  const cards=currentHandSelection();
-  if(!validLeavePreview(cards))return toast("Select a valid group to leave first.");
   selectedSource="open"; selectedPickId=id; updateSelectionUI();
 }
 function submitMove(){
@@ -208,7 +204,7 @@ function bindGameControls(){
   window.__leastscoreControlsBound=true;
   const handle=e=>{
     const hand=e.target.closest?.('#hand [data-role="hand-card"]');
-    if(hand){e.preventDefault(); e.stopPropagation(); if(state?.status!=="playing"||state.turn!==state.me?.username){toast("Wait for your turn.");return;} const id=hand.dataset.id; selectedIds.has(id)?selectedIds.delete(id):selectedIds.add(id); selectedSource=null; selectedPickId=null; updateSelectionUI(); document.querySelectorAll('#hand .card').forEach(x=>x.classList.toggle('selected',selectedIds.has(x.dataset.id))); return;}
+    if(hand){e.preventDefault(); e.stopPropagation(); if(state?.status!=="playing"||state.turn!==state.me?.username){toast("Wait for your turn.");return;} const id=hand.dataset.id; selectedIds.has(id)?selectedIds.delete(id):selectedIds.add(id); updateSelectionUI(); document.querySelectorAll('#hand .card').forEach(x=>x.classList.toggle('selected',selectedIds.has(x.dataset.id))); return;}
     const open=e.target.closest?.('#open .open-choice'); if(open){e.preventDefault();chooseDiscard(open.dataset.pickId);return;}
     if(e.target.closest?.('#deck')){e.preventDefault();chooseDeck();return;}
     if(e.target.closest?.('#move')){e.preventDefault();submitMove();return;}

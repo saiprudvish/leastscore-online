@@ -36,7 +36,6 @@
     <p class="tag">THE CARD GAME WHERE LESS WINS</p>
     <div class="auth-tabs"><button class="tab active" data-mode="login">Login</button><button class="tab" data-mode="register">Sign up</button></div>
     <input id="username" placeholder="Username" autocomplete="username">
-    <input id="email" type="email" placeholder="Email address" autocomplete="email">
     <input id="password" type="password" placeholder="Password (minimum 5 characters)" autocomplete="current-password">
     <button id="guestBtn" class="secondary wide" type="button">Play as Guest</button>
     <button id="authBtn" class="primary wide">Enter the table</button>
@@ -108,7 +107,7 @@
     </section>
   </main>
 
-  <button id="chatToggle" class="chat-fab" aria-label="Open chat"><span>▱</span><i id="chatBadge" class="hidden">0</i></button>
+  <button id="chatToggle" class="chat-fab" aria-label="Open chat"><span>💬</span><i id="chatBadge" class="hidden">0</i></button>
 
   <aside id="chatPanel" class="chat-panel" aria-hidden="true">
     <div class="chat-head"><div><strong>Table chat + Game Bot</strong><small>Ask the bot for help with moves and rules</small></div><div class="chat-head-actions"><button id="askBot" class="bot-help-btn" type="button">🤖 Ask Bot</button><button id="closeChat" class="icon-btn">×</button></div></div>
@@ -125,7 +124,7 @@
 <!-- RESULT -->
 <section id="result" class="result-screen hidden">
   <header class="topbar"><div class="brand mini">♠ LEAST<span>SCORE</span></div><button id="resultExit" class="secondary">Back to lobby</button></header>
-  <main class="result-wrap"><div class="result-hero"><div class="eyebrow">ROUND RESULT</div><h1 id="resultTitle">Round complete</h1><h2 id="resultWinner">Winner</h2><p id="resultMessage" class="muted"></p></div><div class="result-card"><div class="result-head"><span>NEXT ROUND</span><b id="resultDealTimer"></b></div><div class="result-columns"><span>PLAYER</span><span>RESULT</span><span>ROUND</span><span>TOTAL</span></div><div id="resultTableBody" class="result-list"></div><button id="resultDeal" class="primary wide">Start next round</button></div></main>
+  <main class="result-wrap"><div class="result-hero"><div class="eyebrow">ROUND RESULT</div><h1 id="resultTitle">Round complete</h1><h2 id="resultWinner">Winner</h2><p id="resultMessage" class="muted"></p></div><div class="result-card"><div class="result-head"><span>NEXT ROUND</span><b id="resultDealTimer"></b></div><div class="result-columns"><span>PLAYER</span><span>RESULT</span><span>SCORE</span></div><div id="resultTableBody" class="result-list"></div><button id="resultDeal" class="primary wide">Start next round</button></div></main>
 </section>
 
 <script src="/socket.io/socket.io.js"></script>
