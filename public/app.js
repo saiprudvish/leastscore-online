@@ -46,7 +46,16 @@ async function enter(){try{
 }catch(e){$("authMsg").textContent=e.message}}
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));b.classList.add("active");mode=b.dataset.mode;$("authBtn").textContent=mode==="login"?"Enter the table":"Create my account";const email=$("email");if(email){email.placeholder=mode==="login"?"Email or username":"Email address";email.required=mode==="register"}$("authMsg").textContent=""});
 $("authBtn").onclick=enter;$("password").onkeydown=e=>{if(e.key==="Enter")enter()};
-$("googleLogin")?.addEventListener("click",()=>toast("Google sign-in needs a Google OAuth Client ID. Email/password sign-in is ready now; add GOOGLE_CLIENT_ID during deployment to enable Google."));
+$("guestBtn")?.addEventListener("click", async()=>{
+  try {
+    const suggested = $("username")?.value.trim() || "Guest";
+    const j = await api("/api/guest", { username: suggested });
+    token=j.token; localStorage.setItem("ls_token", token);
+    localStorage.removeItem("ls_room");
+    $("welcome").textContent=j.username; $("welcomeAvatar").textContent=j.username[0]?.toUpperCase()||"G";
+    show("lobby"); connect();
+  } catch(e) { $("authMsg").textContent=e.message; }
+});
 $("logout").onclick=()=>{localStorage.removeItem("ls_token");localStorage.removeItem("ls_room");socket?.disconnect();location.reload()};
 
 function renderLobbyDefaults(){$("lobbyRoom")?.classList.add("hidden");$("create")?.classList.remove("hidden");$("roomCode")&&($("roomCode").value="")}
@@ -73,8 +82,8 @@ function leaveCurrentRoom(){
   if(socket?.connected) leave(); else whenConnected(leave);
 }
 $("resultExit").onclick=leaveCurrentRoom;
-$("exitGame").onclick=()=>{if(confirm("Exit this game and return to the lobby?"))leaveCurrentRoom()};
-$("exitGameTop").onclick=()=>{if(confirm("Exit this game and return to the lobby?"))leaveCurrentRoom()};
+$("exitGame").onclick=leaveCurrentRoom;
+$("exitGameTop").onclick=leaveCurrentRoom;
 $("settingsGame").onclick=()=>toast("Game settings are locked after the round starts.");
 
 function rankValue(r){return r==="A"?1:r==="J"?11:r==="Q"?12:r==="K"?13:Number(r)}
@@ -85,7 +94,7 @@ function validLeavePreview(cards){
   return false
 }
 function cardLabel(c){return c?`${c.rank}${c.suit}`:"—"}
-function cardHTML(c){const selected=selectedIds.has(c.id)?" selected":"";return `<button type="button" class="card ${c.color||""}${selected}" data-id="${esc(c.id)}" data-role="hand-card"><div class="corner">${esc(c.rank)}<span class="suit">${esc(c.suit)}</span></div><div class="big">${esc(c.suit)}</div></button>`}
+function cardHTML(c){const selected=selectedIds.has(c.id)?" selected":"";return `<button type="button" class="card ${c.color||""}${selected}" data-id="${esc(c.id)}" data-role="hand-card"><span class="corner top">${esc(c.rank)}<i>${esc(c.suit)}</i></span><span class="pip">${esc(c.suit)}</span><span class="corner bottom">${esc(c.rank)}<i>${esc(c.suit)}</i></span></button>`}
 function secondsLeft(d){return d?Math.max(0,Math.ceil((d-Date.now())/1000)):0}
 
 function updateTimers(){if(!state)return;const mine=state.status==="playing"&&state.turn===state.me?.username;const e=$("turnTimer");if(state.status==="playing"&&state.turnDeadline){const left=secondsLeft(state.turnDeadline);e.textContent=`${left}s`;e.classList.toggle("urgent",left<=5)}else e.textContent="—";$("turnDot")?.classList.toggle("mine",mine);}
@@ -113,7 +122,6 @@ function updateSelectionUI(){
 function renderDiscard(){
   const open=$("open");const cards=state?.openCards||[];
   open.innerHTML=cards.length?cards.slice(-3).map((c,i)=>`<button type="button" class="open-choice ${c.color||""}" data-pick-id="${esc(c.id)}" style="z-index:${i+1}"><span class="rank">${esc(c.rank)}</span><span class="suit">${esc(c.suit)}</span></button>`).join(""):"<div class='open-empty'>No discard</div>";
-  document.querySelectorAll(".open-choice").forEach(el=>el.onclick=e=>{e.stopPropagation();if(state?.turn!==state?.me?.username)return toast("Wait for your turn.");const cards=(state.me.hand||[]).filter(c=>selectedIds.has(c.id));if(!validLeavePreview(cards))return toast("Select a valid group to leave first.");selectedSource="open";selectedPickId=el.dataset.pickId;updateSelectionUI()});
 }
 
 function renderPlayers(){
@@ -191,19 +199,20 @@ function maybeAutoplay(){
   },450);
 }
 
-// Bind controls after every state render. This avoids stale DOM handlers when the hand is rebuilt.
+// Interaction binding is delegated once and works for both mouse and touch.
 function bindGameControls(){
-  // Delegated pointer/click handlers are installed once on the current DOM so cards remain interactive after every render.
-  if(window.__leastscoreControlsBound)return; window.__leastscoreControlsBound=true;
-  document.addEventListener("click",e=>{
-    const hand=e.target.closest('#hand [data-role="hand-card"]');
-    if(hand){e.preventDefault();if(state?.status!=="playing"||state.turn!==state.me?.username)return toast("Wait for your turn.");const id=hand.dataset.id;if(selectedIds.has(id))selectedIds.delete(id);else selectedIds.add(id);selectedSource=null;selectedPickId=null;render();return}
-    const open=e.target.closest('#open .open-choice');if(open){e.preventDefault();chooseDiscard(open.dataset.pickId);return}
-    if(e.target.closest('#deck')){e.preventDefault();chooseDeck();return}
-    if(e.target.closest('#move')){e.preventDefault();submitMove();return}
-    if(e.target.closest('#declare')){e.preventDefault();submitDeclare();return}
-    if(e.target.closest('#autoplay')){e.preventDefault();toggleAutoplay();return}
-  },true);
+  if(window.__leastscoreControlsBound)return;
+  window.__leastscoreControlsBound=true;
+  const handle=e=>{
+    const hand=e.target.closest?.('#hand [data-role="hand-card"]');
+    if(hand){e.preventDefault(); e.stopPropagation(); if(state?.status!=="playing"||state.turn!==state.me?.username){toast("Wait for your turn.");return;} const id=hand.dataset.id; selectedIds.has(id)?selectedIds.delete(id):selectedIds.add(id); selectedSource=null; selectedPickId=null; updateSelectionUI(); document.querySelectorAll('#hand .card').forEach(x=>x.classList.toggle('selected',selectedIds.has(x.dataset.id))); return;}
+    const open=e.target.closest?.('#open .open-choice'); if(open){e.preventDefault();chooseDiscard(open.dataset.pickId);return;}
+    if(e.target.closest?.('#deck')){e.preventDefault();chooseDeck();return;}
+    if(e.target.closest?.('#move')){e.preventDefault();submitMove();return;}
+    if(e.target.closest?.('#declare')){e.preventDefault();submitDeclare();return;}
+    if(e.target.closest?.('#autoplay')){e.preventDefault();toggleAutoplay();return;}
+  };
+  document.addEventListener('click',handle,true);
 }
 document.addEventListener("touchstart", ensureAudio, {passive:true, once:true});
 

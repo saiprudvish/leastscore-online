@@ -11,3 +11,17 @@
 .move-table-head span:first-child{grid-column:1/2}.move-table-head span:nth-child(2){grid-column:2/3}.move-table-head span:nth-child(3){grid-column:3/4}.move-table-head span:nth-child(4){grid-column:4/5}
 .move-row{grid-template-columns:28px 1.1fr 1fr .8fr 42px!important;gap:6px}.move-player{min-width:0}.move-player b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.move-player small{color:#7f8998;font-size:9px}.move-left,.move-picked{font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#d9dee6}.move-score{font-size:11px;text-align:right}.move-row.active{background:#ffc95c0d;border-radius:8px}.drawer-table-head{margin:0 12px;grid-template-columns:1.2fr 1fr .8fr 42px}.drawer-player{grid-template-columns:28px 1.1fr 1fr .8fr 42px!important}
 @media(max-width:700px){.game-top-actions .top-icon{font-size:16px!important;width:36px}.game-top-actions .code-icon{font-size:10px!important}.game-top-actions .top-icon span{font-size:8px}.move-table-head{grid-template-columns:1.2fr 1fr .8fr 36px}.move-row{grid-template-columns:24px 1.05fr .9fr .75fr 34px!important;font-size:9px}.move-left,.move-picked{font-size:8px}}
+
+/* V19: stable, full-size playing cards and touch controls */
+#hand{display:flex!important;flex-wrap:nowrap!important;justify-content:center!important;align-items:flex-end!important;overflow:visible!important;min-height:142px!important;padding:10px 2px 6px!important}
+#hand .card{display:block!important;width:68px!important;height:102px!important;min-width:68px!important;max-width:68px!important;aspect-ratio:2/3!important;border-radius:10px!important;background:linear-gradient(145deg,#fffdf7,#e9e3d6)!important;color:#171717!important;overflow:hidden!important;transform:none!important;will-change:transform!important}
+#hand .card.selected{transform:translateY(-16px)!important;border-color:#ffc95c!important;box-shadow:0 0 0 4px #ffc95c33,0 18px 28px #000a!important}
+#hand .card .corner{position:absolute!important;display:flex!important;flex-direction:column!important;align-items:center!important;font:700 16px/1 Georgia!important;letter-spacing:0!important}
+#hand .card .corner i{font-style:normal!important;font-size:15px!important;margin-top:2px!important}
+#hand .card .top{top:7px!important;left:7px!important}
+#hand .card .bottom{right:7px!important;bottom:7px!important;transform:rotate(180deg)!important}
+#hand .card .pip{position:absolute!important;inset:0!important;display:grid!important;place-items:center!important;font:42px Georgia!important}
+#hand .card.red{color:#b52f37!important}
+.game-top-actions .top-icon{display:grid!important;place-items:center!important;min-width:40px!important;min-height:40px!important;padding:0 9px!important;font-size:16px!important}
+#exitGame,#exitGameTop,#settingsGame,#copyGameCode{touch-action:manipulation!important;pointer-events:auto!important}
+@media(max-width:700px){#hand{min-height:136px!important;gap:6px!important}#hand .card{width:calc((100vw - 48px)/5)!important;min-width:0!important;max-width:76px!important;height:auto!important;aspect-ratio:2/3!important}.game-top-actions{gap:5px!important}.game-top-actions .top-icon{width:40px!important;min-width:40px!important;font-size:16px!important}.game-top-actions .code-icon{font-size:10px!important}.move-row{grid-template-columns:28px 1.1fr .9fr .75fr 34px!important}.move-table-head{grid-template-columns:1.2fr .9fr .75fr 34px!important}}
